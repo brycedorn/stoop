@@ -1,0 +1,28 @@
+[project]
+name = "stoop"
+version = "0.1.0"
+description = "Data-driven NYC neighborhood finder"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.1",
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "pyarrow>=14",
+  "requests>=2.31",
+  "pyyaml>=6",
+  "geopandas>=1.0",
+  "shapely>=2.0",
+  "pyproj>=3.6",
+  "osmnx>=2.0",
+]
+
+[project.optional-dependencies]
+transit = ["r5py>=0.1.1"]        # real commute times; needs Java 21 (JDK) installed
+activities = ["fitdecode>=0.10"]  # read .fit files among your GPS activities (inputs/activities/)
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["stoop", "stoop.sources"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

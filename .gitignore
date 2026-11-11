@@ -1,0 +1,34 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# downloaded and derived data (rebuild with `python -m stoop run`)
+data/
+web/data/
+
+# personal inputs: comment these out if you want them in git
+inputs/places.csv
+inputs/activities/*
+!inputs/activities/README.md
+inputs/rents/*.csv
+
+# runner-hex input: may hold third-party data, never in git
+inputs/runner_hexes.json
+
+# agent skills and design-tool working files (installed per machine)
+.agents/
+.claude/skills/
+skills-lock.json
+.impeccable/
+
+# your personal settings (layered on config.yaml)
+config.local.yaml
+
+# the public site build (`python -m stoop publish`); it lives on the gh-pages branch
+site/
+
+# planning docs live in ../stoop-planning; agent notes and local tool settings stay untracked
+CLAUDE.md
+.claude/

@@ -1,0 +1,99 @@
+# stoop: public defaults and data-source settings (published; keep personal details out of this file).
+# Your own settings (destination labels, budget, liked areas, weights, local paths) go in config.local.yaml,
+# which is gitignored and layered on top of this file. Then run:  python -m stoop run
+
+you:
+  # Places you might commute to: Manhattan's main office clusters. Commute is scored to ONE of them, `commute_to`
+  # (the map can switch live). After adding or renaming one, rerun: python -m stoop run --steps commute (~50 min)
+  commute_to: FiDi-WTC
+  commute_destinations:
+    - {name: FiDi-WTC, lat: 40.7101, lon: -74.0119, weight: 1.0}
+    - {name: Hudson Square, lat: 40.7280, lon: -74.0078, weight: 1.0}
+    - {name: Chelsea, lat: 40.7411, lon: -74.0033, weight: 1.0}
+    - {name: Hudson Yards, lat: 40.7530, lon: -73.9995, weight: 1.0}
+    - {name: Flatiron-Union Sq, lat: 40.7397, lon: -73.9897, weight: 1.0}
+    - {name: Midtown, lat: 40.7536, lon: -73.9832, weight: 1.0}
+    - {name: Empire State, lat: 40.7484, lon: -73.9857, weight: 1.0}
+  commute_departure: auto   # "auto" = next Tuesday 08:30, or e.g. "2026-11-10T08:30" (must fall inside the GTFS calendar)
+  max_rent: 4000          # USD / month (the map's "Max rent" box overrides this live)
+  bedrooms: 1             # 0 = studio, 1, 2, 3 (3 = 3+); default for the map's bedroom selector
+  exclude_boroughs: []    # e.g. [Staten Island] (the map's Boroughs menu changes this live)
+  # Neighborhoods you've visited and liked: NTA names, pieces of them, or codes.
+  # Drives the "Familiar areas" factor. Rerun: python -m stoop run --steps familiarity
+  liked_neighborhoods: []
+
+# Walk radius used for "what's near me" counts. ~1 km ≈ 12-15 min walk.
+walk_radius_m: 1000
+grid: hex                 # analysis grid: hex (needed for the hex view) or square
+grid_hex_m: 150           # hex size, center to corner (~260 m across); same lattice as the runner hexes
+grid_cell_m: 200          # square cell size, only used with grid: square
+
+# Every factor is scored 0-100. These are default slider weights; the map
+# lets you change them live.
+default_weights:
+  running: 15
+  commute: 20
+  rent: 20
+  safety: 10
+  quiet: 8
+  green: 8
+  errands: 6
+  gym: 5                  # full-size gyms nearby
+  airports: 3             # transit time to JFK, LaGuardia, Newark (averaged)
+  citibike: 3
+  flood: 3
+  size: 8
+  familiarity: 0          # needs liked_neighborhoods
+  runhex: 0               # needs a runner-hex file (sources.runner_hexes); never restricted third-party data
+  run5k: 10               # walk to a car-free 5K route (OpenStreetMap park loops, greenways)
+
+census:
+  # Free key: https://api.census.gov/data/key_signup.html
+  # Or set the CENSUS_API_KEY environment variable.
+  api_key: ""
+  acs_year: 2023          # ACS 5-year vintage
+
+sources:
+  # NYC Open Data (Socrata) dataset IDs. Change here if a dataset moves.
+  nyc_open_data: https://data.cityofnewyork.us
+  ny_state_open_data: https://data.ny.gov
+  ntas: 9nt8-h7nd                 # 2020 Neighborhood Tabulation Areas
+  tracts: 63ge-mke6               # 2020 Census Tracts (has GEOID + NTA2020)
+  nypd_complaints: 5uac-w243      # NYPD Complaint Data, current year-to-date
+  nypd_complaints_historic: qgea-i56i
+  complaints_311: erm2-nwe9       # 311 Service Requests (noise)
+  parks: enfh-gkve                # Parks Properties
+  street_trees: uvpi-gqnh         # 2015 Street Tree Census
+  subway_stations: 39hk-dx4f      # MTA Subway Stations (data.ny.gov)
+  sandy_inundation: 5xsi-dfpx     # Hurricane Sandy inundation zone (uyj8-7rv5 is only a map view of it)
+  stormwater_flood_arcgis: https://services2.arcgis.com/IsDCghZ73NgoYoz5/ArcGIS/rest/services/Moderate_Current_Sea_Levels/FeatureServer/0
+  citibike_stations: https://gbfs.citibikenyc.com/gbfs/en/station_information.json
+  # NYC Health Environment & Health Data Portal (air quality, by community district)
+  ehdp_data: https://raw.githubusercontent.com/nychealth/EHDP-data/production/indicators
+  # Transit routing inputs (only needed for the commute step)
+  osm_pbf: https://download.bbbike.org/osm/bbbike/NewYork/NewYork.osm.pbf
+  gtfs:   # https://mta.info/developers
+    - https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip
+    - https://rrgtfsfeeds.s3.amazonaws.com/gtfs_m.zip
+    - https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip
+    - https://rrgtfsfeeds.s3.amazonaws.com/gtfs_q.zip
+    - https://rrgtfsfeeds.s3.amazonaws.com/gtfs_bx.zip
+    - https://rrgtfsfeeds.s3.amazonaws.com/gtfs_si.zip
+    - https://rrgtfsfeeds.s3.amazonaws.com/gtfs_busco.zip
+  # Listing rents (optional): median asking rent CSVs by neighborhood that you supply (see inputs/rents/README.md),
+  # or a download URL template with {b} for the bedroom code, set in config.local.yaml. Without them, rents are
+  # Census ACS estimates.
+  rents_dir: inputs/rents
+  rent_csv_url: ""
+  # Runner traffic by hex, made by a separate tool (format: stoop/sources/runner_hexes.py). Path or file in inputs/.
+  runner_hexes: inputs/runner_hexes.json
+
+# Real transit routing (commute step) with r5py. R5 needs Java 21 specifically; this points r5py at it
+# without changing your default Java. Leave java_home empty to use the JAVA_HOME environment variable.
+transit:
+  java_home: ""           # path to Java 21 (set yours in config.local.yaml); empty = the JAVA_HOME environment variable
+  max_memory: 8G          # JVM heap for R5
+  departure_window_min: 60  # median travel time over departures in this window
+
+# Look-back window for crime and 311 noise.
+lookback_days: 365

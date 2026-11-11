@@ -1,0 +1,6 @@
+# Copy to places.csv and replace with your own list.
+# Only `name` is required. Add an address when the name is ambiguous, or lat/lon to skip geocoding.
+# weight: 2 = a favorite you'd go to weekly, 0.5 = nice to have.
+name,category,address,lat,lon,weight
+Example Bar,bar,123 Example St Brooklyn,,,1
+Example Restaurant,restaurant,,40.7265,-73.9815,2
