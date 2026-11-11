@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>stoop · NYC neighborhood finder</title>
+  <meta name="description" content="Rank NYC neighborhoods by what matters to you: rent, commute, running, your favorite places, safety and more.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+  <script>/* apply a saved Light/Dark choice before the first paint (no flash) */
+    try { var t = localStorage.getItem("stoop.theme.v1"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#ranking">Skip to matches</a>
+
+  <!-- Must-haves: one filter row above everything it scopes -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">stoop</span>
+      <span class="tagline">NYC neighborhood finder</span>
+    </div>
+
+    <button class="btn filters-toggle" id="filtersToggle" type="button" aria-expanded="false" aria-controls="filters">
+      <span>Filters</span><span class="ft-sum" id="filtersSummary"></span>
+    </button>
+
+    <div class="filters" id="filters" role="group" aria-label="Must-haves">
+      <fieldset class="seg" aria-label="Bedrooms">
+        <legend>Bedrooms</legend>
+        <div class="seg-row" id="bedrooms">
+          <label><input type="radio" name="bd" value="0"><span>Studio</span></label>
+          <label><input type="radio" name="bd" value="1"><span>1</span></label>
+          <label><input type="radio" name="bd" value="2"><span>2</span></label>
+          <label><input type="radio" name="bd" value="3"><span>3+</span></label>
+        </div>
+      </fieldset>
+
+      <label class="range">
+        <span class="range-head"><span>Max rent</span><output id="budgetOut"></output></span>
+        <input id="budget" type="range" min="1500" max="10000" step="100">
+      </label>
+
+      <label class="range">
+        <span class="range-head"><span>Max commute</span><output id="commuteOut"></output></span>
+        <input id="maxCommute" type="range" min="15" max="90" step="5">
+      </label>
+
+      <details class="dropdown" id="destBox">
+        <summary><span class="dd-label">Commute to</span> <span class="dd-btn" id="destSummary"></span></summary>
+        <div class="dd-menu dest-menu" id="destMenu"></div>
+      </details>
+
+      <details class="dropdown" id="areaBox">
+        <summary><span class="dd-label">Radius</span> <span class="dd-btn" id="areaSummary"></span></summary>
+        <div class="dd-menu area-menu" id="areaMenu">
+          <label class="area-on"><input type="checkbox" id="areaOn"> Only neighborhoods within a radius</label>
+          <label class="range area-range">
+            <span class="range-head"><span>Within</span><output id="areaOut"></output></span>
+            <input id="areaKm" type="range" min="0.5" max="12" step="0.25" aria-label="Radius in miles">
+          </label>
+          <p class="dd-hint" id="areaCenter"></p>
+          <div class="dd-actions">
+            <button class="btn" type="button" id="areaPick">Drop center on map</button>
+            <button class="btn ghost" type="button" id="areaUseSel">Use selected area</button>
+          </div>
+          <p class="dd-hint">Drag the round center pin to move it. Neighborhoods whose center is outside the circle are left out.</p>
+        </div>
+      </details>
+
+      <details class="dropdown" id="boroughBox">
+        <summary><span class="dd-label">Boroughs</span> <span class="dd-btn" id="boroughSummary"></span></summary>
+        <div class="dd-menu" id="boroughs"></div>
+      </details>
+
+      <label class="toggle">
+        <input id="showOver" type="checkbox" aria-label="Include over-budget areas">
+        <span class="t-long">Include over-budget areas</span><span class="t-short" aria-hidden="true">Over budget too</span>
+      </label>
+    </div>
+
+    <p class="count" id="count" aria-live="polite"></p>
+    <div class="seg-row seg-theme" id="themeSeg" role="radiogroup" aria-label="Color theme">
+      <label title="Match my system"><input type="radio" name="theme" value="auto" aria-label="Auto (match system)"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/></svg></span></label>
+      <label title="Light"><input type="radio" name="theme" value="light" aria-label="Light"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></span></label>
+      <label title="Dark"><input type="radio" name="theme" value="dark" aria-label="Dark"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span></label>
+    </div>
+  </header>
+
+  <aside id="panel" aria-label="Neighborhoods">
+    <div class="tabs" role="tablist" aria-label="Panel">
+      <button role="tab" id="tab-matches" aria-controls="pane-matches" aria-selected="true">Matches</button>
+      <button role="tab" id="tab-priorities" aria-controls="pane-priorities" aria-selected="false">Priorities</button>
+      <button role="tab" id="tab-shortlist" aria-controls="pane-shortlist" aria-selected="false">Shortlist <span class="badge" id="shortCount">0</span></button>
+      <button class="btn sm" id="quickCompare" type="button" hidden></button>
+    </div>
+
+    <section class="pane" id="pane-matches" role="tabpanel" aria-labelledby="tab-matches">
+      <div class="list-tools">
+        <div class="search">
+          <input id="search" type="search" placeholder="Find a neighborhood…" aria-label="Find a neighborhood" aria-keyshortcuts="/" autocomplete="off">
+          <kbd aria-hidden="true">/</kbd>
+        </div>
+        <select id="sort" aria-label="Sort matches">
+          <option value="match">Best match</option>
+          <option value="rent">Lowest rent</option>
+          <option value="commute">Shortest commute</option>
+          <option value="size">Biggest apartments</option>
+        </select>
+      </div>
+      <ol id="ranking" class="ranking" tabindex="-1"></ol>
+    </section>
+
+    <section class="pane" id="pane-priorities" role="tabpanel" aria-labelledby="tab-priorities" hidden>
+      <p class="hint">How much each thing counts toward the match score. Shares add up to 100%.</p>
+      <details class="more how">
+        <summary>How the match score works</summary>
+        <ul>
+          <li>Each factor scores a neighborhood from 0 to 100. Most are percentiles among NYC's residential areas (100 = best in the city).</li>
+          <li>Rent, commute and flood use fixed curves instead: rent against your budget, minutes of commute, the share of land that floods.</li>
+          <li>The match is the average of the factors you turn on, weighted by these shares. Must-haves (bedrooms, budget, commute, boroughs) decide what's listed, not the score.</li>
+        </ul>
+      </details>
+      <p class="warn-line" id="weightsMsg" role="status" hidden>Every priority is off, so no neighborhood gets a score. Turn at least one up.</p>
+      <div class="presets" id="presets" role="group" aria-label="Presets"></div>
+      <div id="weights"></div>
+      <button class="btn ghost" id="reset" type="button">Reset to my defaults</button>
+    </section>
+
+    <section class="pane" id="pane-shortlist" role="tabpanel" aria-labelledby="tab-shortlist" hidden>
+      <p class="hint" id="shortHint">Star neighborhoods in Matches or on the map to compare them side by side.</p>
+      <ol id="shortlist" class="ranking"></ol>
+      <button class="btn primary" id="compareBtn" type="button" disabled>Compare side by side</button>
+    </section>
+
+    <footer class="panel-foot">
+      <p id="meta"></p>
+    </footer>
+  </aside>
+
+  <main id="mapwrap">
+    <div id="map" role="region" aria-label="Map of NYC neighborhoods colored by match"></div>
+
+    <div class="map-tools">
+      <button class="btn map-btn" id="fitBtn" type="button">Zoom to matches</button>
+      <details class="map-layers" id="layersBox">
+        <summary class="btn map-btn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5"/></svg>Layers &amp; key</summary>
+        <div class="dd-menu layers-menu" id="layersMenu"></div>
+      </details>
+      <div class="sel-chip" id="selChip" role="status" hidden></div>
+    </div>
+    <div class="map-card legend-card">
+      <label class="colorby">Color by <select id="colorBy"></select></label>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="map-hint" id="mapHint" role="status" hidden>Click the map to drop a destination · Esc to cancel</div>
+
+    <div id="tooltip" role="tooltip" hidden></div>
+
+    <div id="nodata" hidden>
+      <h2>No data yet</h2>
+      <p>Run <code>python -m stoop demo</code> for a preview, or <code>python -m stoop run</code> for real data. Then reload.</p>
+    </div>
+  </main>
+
+  <aside id="detail" aria-label="Neighborhood details" hidden></aside>
+
+  <div id="compare" role="dialog" aria-modal="true" aria-labelledby="compareTitle" hidden></div>
+
+  <script src="data/stoop.js"></script>
+  <script src="data/layers.js" onerror="window.STOOP_LAYERS = {}"></script>
+  <script src="data/airports.js" onerror="window.STOOP_AIRPORTS = {}"></script>
+  <script src="data/hexes.js" onerror="window.STOOP_HEXES = null"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
