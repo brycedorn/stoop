@@ -30,7 +30,7 @@ log = logging.getLogger("stoop.publish")
 
 RENT_BAND = 500
 RESTRICTED_NAMES = ["listings"]   # plus config.local.yaml `publish.never_name`: sources the site must never name
-SITE_FILES = ["index.html", "app.js", "style.css"]
+SITE_FILES = ["index.html", "app.js", "style.css", "fonts/schibsted-grotesk-latin.woff2", "fonts/OFL.txt"]
 PERSONAL_COLUMNS = {"familiar_dist_m", "fav_score", "fav_within_walk", "activity_density", "runhex_score"}
 PERSONAL_LAYERS = ("places", "runhex")
 PERSONAL_FACTORS = {"familiarity", "runhex"}
@@ -100,6 +100,7 @@ def build_site(out: Path, root: Path | None = None) -> Path:
         shutil.rmtree(out)
     (out / "data").mkdir(parents=True)
     for f in SITE_FILES:
+        (out / f).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(root / "web" / f, out / f)
     (out / ".nojekyll").write_text("", encoding="utf-8")   # serve files as they are
 

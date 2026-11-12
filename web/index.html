@@ -6,11 +6,12 @@
   <title>stoop · NYC neighborhood finder</title>
   <meta name="description" content="Rank NYC neighborhoods by what matters to you: rent, commute, running, your favorite places, safety and more.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fbf9f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1b1a17" media="(prefers-color-scheme: dark)">
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="preload" href="fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script>/* apply a saved Light/Dark choice before the first paint (no flash) */
     try { var t = localStorage.getItem("stoop.theme.v1"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
