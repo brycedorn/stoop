@@ -153,7 +153,52 @@
     }
   } catch (e) { /* storage unavailable: defaults are fine */ }
 
+  // ---------- link: priorities, must-haves and the open neighborhood live in the address (#w=…&rent=…&n=…) ----------
+  // A link wins over what this browser remembers, so whoever opens it sees the same ranking. Commute pins and the
+  // radius filter stay out of it: they're places (often a home or an office) and a link gets passed around.
+  const BORO_CODE = { Bronx: "x", Brooklyn: "k", Manhattan: "m", Queens: "q", "Staten Island": "s" };
+  let linkSelect = null;
+  function readLink() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (h.has("w")) {
+      const w = Object.fromEntries(FACTORS.map((k) => [k, 0]));
+      for (const part of h.get("w").split(",")) {
+        const [k, v] = part.split(":");
+        if (FACTORS.includes(k) && Number.isFinite(+v) && +v >= 0) w[k] = Math.min(100, Math.round(+v));
+      }
+      state.weights = w;
+    }
+    if (+h.get("rent") > 0) state.budget = Math.round(+h.get("rent"));
+    if (["0", "1", "2", "3"].includes(h.get("bd"))) state.bedrooms = h.get("bd");
+    if (+h.get("min") > 0) state.maxCommute = Math.round(+h.get("min"));
+    if (h.has("over")) state.showOver = h.get("over") === "1";
+    if (h.has("b")) {
+      const picked = new Set(BOROUGHS.filter((b) => BORO_CODE[b] && h.get("b").includes(BORO_CODE[b])));
+      if (picked.size) state.boroughs = picked;
+    }
+    if (h.get("color") === "total" || AVAILABLE.includes(h.get("color"))) state.colorBy = h.get("color");
+    if (BY_ID.has(h.get("n"))) linkSelect = h.get("n");
+  }
+  try { readLink(); } catch (e) { /* a mangled link: keep what we have */ }
+  function linkHash() {
+    const w = FACTORS.filter((k) => (state.weights[k] || 0) > 0).map((k) => `${k}:${Math.round(state.weights[k])}`).join(",");
+    const p = new URLSearchParams({ w, rent: state.budget, bd: state.bedrooms, min: state.maxCommute });
+    if (state.showOver) p.set("over", "1");
+    if (state.boroughs.size < BOROUGHS.length) p.set("b", [...state.boroughs].map((b) => BORO_CODE[b] || "").join(""));
+    if (state.colorBy !== "total") p.set("color", state.colorBy);
+    if (state.selected) p.set("n", state.selected);
+    return p.toString().replace(/%3A/g, ":").replace(/%2C/g, ",");
+  }
+  function writeLink() {
+    try {
+      const h = linkHash();
+      if (location.hash.slice(1) !== h) history.replaceState(history.state, "", "#" + h);
+    } catch (e) {}
+  }
+  window.addEventListener("hashchange", () => location.reload());   // a different link pasted into this tab
+
   function persist() {
+    writeLink();
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify({
         weights: state.weights, budget: state.budget, bedrooms: state.bedrooms, maxCommute: state.maxCommute,
@@ -403,6 +448,17 @@
     commute.oninput = () => { state.maxCommute = +commute.value; schedule(); };
     $("showOver").checked = state.showOver;
     $("showOver").onchange = (e) => { state.showOver = e.target.checked; update(); };
+    $("resetFilters").onclick = () => {
+      const d = defaults();
+      Object.assign(state, { budget: d.budget, bedrooms: d.bedrooms, maxCommute: d.maxCommute, showOver: d.showOver,
+        boroughs: new Set(d.boroughs) });
+      state.area = { ...state.area, on: false };
+      for (const i of document.querySelectorAll('input[name="bd"]')) i.checked = i.value === state.bedrooms;
+      budget.value = state.budget; commute.value = state.maxCommute; $("showOver").checked = state.showOver;
+      for (const i of $("boroughs").querySelectorAll("input")) i.checked = state.boroughs.has(i.value);
+      update();
+      document.querySelector('input[name="bd"]:checked')?.focus();   // the Reset button hides itself
+    };
 
     $("boroughs").innerHTML = BOROUGHS.map((b) =>
       `<label><input type="checkbox" value="${esc(b)}" ${state.boroughs.has(b) ? "checked" : ""}> ${esc(b)}</label>`).join("") +
@@ -424,7 +480,9 @@
   function syncFilters() {
     $("budgetOut").textContent = "$" + fmtInt(state.budget);
     $("commuteOut").textContent = state.maxCommute + " min";
-    const n = state.boroughs.size;
+    const n = state.boroughs.size, d = defaults();
+    $("resetFilters").hidden = state.budget === d.budget && state.bedrooms === d.bedrooms && state.maxCommute === d.maxCommute &&
+      state.showOver === d.showOver && !state.area.on && n === d.boroughs.length && d.boroughs.every((b) => state.boroughs.has(b));
     $("boroughSummary").textContent = n === BOROUGHS.length ? "All" : n === 0 ? "None" :
       n <= 2 ? [...state.boroughs].join(", ") : `${n} of ${BOROUGHS.length}`;
     const shown = results.filter((r) => r.rank).length;
@@ -663,6 +721,48 @@
     while (cur) { const next = cur.nextSibling; cur.remove(); cur = next; }
     items.forEach((x, i) => x.set?.(nodes[i]));
     fitTags(list, nodes.filter((n) => !n._fit));
+    rove(list);
+  }
+
+  // The list is one tab stop: Tab lands on one row (the open neighborhood's, else the last one used, else the
+  // first); ↑/↓, Home and End move between rows, → reaches the row's star and ← comes back.
+  function rove(list, to) {
+    const rows = [...list.querySelectorAll("button.row")];
+    if (to) list._cur = to.dataset.select;
+    const pick = rows.find((b) => b.dataset.select === list._cur) || rows.find((b) => b.dataset.select === state.selected) || rows[0];
+    for (const b of rows) b.tabIndex = b === pick ? 0 : -1;
+    for (const s of list.querySelectorAll(".star")) s.tabIndex = -1;
+  }
+  function roveKeys(list, e) {
+    const btn = e.target.closest("button.row, .star");
+    if (!btn) return;
+    const li = btn.closest("li"), rows = [...list.querySelectorAll("button.row")];
+    const row = li.querySelector("button.row"), i = rows.indexOf(row);
+    let next = null;
+    if (e.key === "ArrowDown") next = rows[i + 1];
+    else if (e.key === "ArrowUp") next = rows[i - 1];
+    else if (e.key === "Home") next = rows[0];
+    else if (e.key === "End") next = rows[rows.length - 1];
+    else if (e.key === "ArrowRight" && btn === row) { e.preventDefault(); li.querySelector(".star")?.focus(); return; }
+    else if (e.key === "ArrowLeft" && btn !== row) { e.preventDefault(); row.focus(); return; }
+    else return;
+    e.preventDefault();
+    if (!next) return;
+    rove(list, next);
+    next.focus();
+    next.closest("li").scrollIntoView({ block: "nearest" });
+  }
+  // Keyboard users go where the content went: into the panel when it opens, back to the row when it closes
+  function focusDetail() {
+    requestAnimationFrame(() => $("detail").querySelector(".d-head h2")?.focus({ preventScroll: true }));
+  }
+  function closeDetailFocus() {
+    const id = state.selected, inPanel = $("detail").contains(document.activeElement);
+    select(null);
+    if (!inPanel || !id) return;
+    const list = state.tab === "shortlist" ? $("shortlist") : $("ranking");
+    const row = list.querySelector(`button.row[data-select="${CSS.escape(id)}"]`);
+    if (row) { rove(list, row); row.focus(); } else $("search").focus();
   }
 
   // Drop whole tags that would be clipped, least important first (2nd strength, then the weakness).
@@ -724,8 +824,14 @@
         const star = e.target.closest("[data-star]");
         if (star) return toggleStar(star.dataset.star);
         const row = e.target.closest("[data-select]");
-        if (row) select(row.dataset.select, true);
+        if (row) {
+          rove(el, row);
+          select(row.dataset.select, true);
+          if (e.detail === 0) focusDetail();   // Enter or Space, not a mouse click
+        }
       });
+      el.addEventListener("keydown", (e) => roveKeys(el, e));
+      el.addEventListener("focusin", (e) => { const row = e.target.closest("button.row"); if (row) rove(el, row); });
       el.addEventListener("pointerover", (e) => { const li = e.target.closest("li[data-id]"); setHover(li ? li.dataset.id : null, false); });
       el.addEventListener("pointerleave", () => setHover(null, false));
     }
@@ -1062,7 +1168,7 @@
       <button class="d-grab" type="button" id="grabDetail" aria-label="${box.classList.contains("full") ? "Show less" : "Show more"}"></button>
       <button class="d-back" type="button" id="backDetail">${BACK}Matches</button>
       <div class="d-head">
-        <div class="d-title"><h2>${esc(p.name)}</h2>
+        <div class="d-title"><h2 tabindex="-1">${esc(p.name)}</h2>
           <div class="d-sub">${esc(p.borough)}${r.rank ? ` · #${r.rank} of ${results.filter((x) => x.rank).length} matches` : ""}</div></div>
         <button class="icon-btn star" type="button" data-star="${esc(r.id)}" aria-pressed="${starred}" aria-label="${starred ? "Remove from" : "Add to"} shortlist">${STAR}</button>
         <button class="icon-btn" type="button" id="closeDetail" aria-label="Close details">${CLOSE}</button>
@@ -1097,8 +1203,8 @@
       if (hadFocus) $(hadFocus)?.focus({ preventScroll: true });
     }
     box.hidden = false;
-    $("closeDetail").onclick = () => select(null);
-    $("backDetail").onclick = () => select(null);
+    $("closeDetail").onclick = closeDetailFocus;
+    $("backDetail").onclick = closeDetailFocus;
     $("grabDetail").onclick = () => { box.classList.toggle("full"); $("grabDetail").setAttribute("aria-label", box.classList.contains("full") ? "Show less" : "Show more"); };
     box.querySelector("[data-star]").onclick = () => toggleStar(r.id);
     box.querySelectorAll("[data-air]").forEach((b) => { b.onclick = () => pinAirport(b.dataset.air); });
@@ -2180,6 +2286,7 @@
   function select(id, fly) {
     const prev = state.selected;
     state.selected = id;
+    writeLink();
     if (id !== prev) $("detail").classList.remove("full");   // a new area opens the phone sheet at its short height
     renderDetail();   // the docked panel changes the map's width; the ResizeObserver on #mapwrap resizes the map
     if (id && fly && map) {
@@ -2251,7 +2358,7 @@
     else if (!$("compare").hidden) closeCompare();
     else if (state.marker) clearMarker();
     else if (state.airRoute?.pinned) pinAirport(null);
-    else if (state.selected) select(null);
+    else if (state.selected) closeDetailFocus();
   });
 
   const built = new Date(String(META.generated_at).replace(" UTC", "Z").replace(" ", "T"));
@@ -2283,5 +2390,16 @@
   buildFilters(); buildTabs(); bindLists(); buildPriorities(); buildColorBy(); bindDestMenu(); renderDestMenu(); renderLayersMenu(); bindLegend(); buildArea();
   update();
   initMap();
+  if (linkSelect) select(linkSelect, true);
+  $("copyLink").onclick = async () => {
+    writeLink();
+    let ok = false;
+    try { await navigator.clipboard.writeText(location.href); ok = true; } catch (e) {}
+    $("copyMsg").textContent = ok ? "Link copied. It opens this ranking and must-haves (not your commute pins)." :
+      "Copy the address bar: it holds this ranking.";
+    $("copyMsg").hidden = false;
+    clearTimeout($("copyMsg")._t);
+    $("copyMsg")._t = setTimeout(() => { $("copyMsg").hidden = true; }, 5000);
+  };
   window.__stoop = { state, results: () => results, update, map: () => map };   // for debugging in the console
 })();

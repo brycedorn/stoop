@@ -83,6 +83,7 @@
         <input id="showOver" type="checkbox" aria-label="Include over-budget areas">
         <span class="t-long">Include over-budget areas</span><span class="t-short" aria-hidden="true">Over budget too</span>
       </label>
+      <button class="btn ghost sm" id="resetFilters" type="button" hidden>Reset</button>
     </div>
 
     <p class="count" id="count" aria-live="polite"></p>
@@ -129,6 +130,8 @@
       </details>
       <p class="warn-line" id="weightsMsg" role="status" hidden>Every priority is off, so no neighborhood gets a score. Turn at least one up.</p>
       <div class="presets" id="presets" role="group" aria-label="Presets"></div>
+      <div class="link-row"><button class="btn ghost sm" id="copyLink" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Copy link to this ranking</button>
+        <p class="ts" id="copyMsg" role="status" hidden></p></div>
       <ol class="rank" id="rank" aria-label="Your priorities, most important first"></ol>
       <p class="sr-only" id="rankLive" role="status" aria-live="polite"></p>
       <details class="more finetune">
