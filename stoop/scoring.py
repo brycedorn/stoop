@@ -5,7 +5,7 @@ Pure pandas/numpy (no geo dependencies) so it's easy to unit-test.
 Two kinds of scoring:
 - percentile: rank among residential NTAs; 100 = best in the city.
 - absolute: a fixed curve where the number itself matters (rent vs your
-  budget, minutes of commute, share of land that floods).
+  budget, minutes of commute).
 A factor with several components averages them by weight, skipping any
 component that's missing for that neighborhood.
 """
@@ -75,11 +75,6 @@ FACTORS: dict[str, dict] = {
         "help": "Citi Bike docks within 400 m.",
         "components": [("citibike_400m", +1, 0.7), ("citibike_dist_m", -1, 0.3)],
     },
-    "flood": {
-        "label": "Flood safety",
-        "help": "Share of the area in modeled stormwater-flood or Sandy-inundation zones: 0% = 100, 30%+ = 0.",
-        "components": [("flood_share", "flood", 1.0)],
-    },
     "space": {
         "label": "Breathing room",
         "help": "Lower population density. Leave at 0 if you don't mind crowds.",
@@ -121,11 +116,6 @@ def rent_curve(rent, budget: float):
         np.where(r <= 1.0, 100 - (r - 0.7) / 0.3 * 50,
         np.where(r <= 1.15, 50 - (r - 1.0) / 0.15 * 50, 0.0)))
     return np.where(np.isnan(r), np.nan, s)
-
-
-def flood_curve(share):
-    s = np.asarray(share, float)
-    return np.clip(1 - s / 0.30, 0, 1) * 100
 
 
 AIRPORT_GOOD_MIN, AIRPORT_BAD_MIN = 55, 115   # average of the three airports; routed range is 55 (Jackson Hts) to ~136
@@ -179,8 +169,6 @@ def component_score(features: pd.DataFrame, col: str, how, mask: pd.Series, cfg:
         return pd.Series(commute_curve(v), index=v.index)
     if how == "rent":
         return pd.Series(rent_curve(v, cfg["you"]["max_rent"]), index=v.index)
-    if how == "flood":
-        return pd.Series(flood_curve(v), index=v.index)
     if how == "familiar":
         return pd.Series(familiar_curve(v), index=v.index)
     if how == "gym":

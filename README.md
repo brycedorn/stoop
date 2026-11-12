@@ -18,7 +18,6 @@ neighborhoods on what matters to you, and you tune the weights live on a map.
 | Daily errands | OSM supermarkets, pharmacies, laundromats |
 | Gyms | OSM full-size gyms (Equinox, Planet Fitness, Blink, YMCA, Parks rec centers…), not boutique studios |
 | Citi Bike | Citi Bike GBFS station feed |
-| Flood safety | NYC stormwater flood map, Sandy inundation zone |
 | Breathing room | Census population density |
 
 It runs on your laptop and costs nothing: a Python pipeline writes one data
@@ -82,8 +81,7 @@ python -m stoop run --steps rent,safety,quiet,citibike --refresh rent,safety,qui
 - Select a neighborhood and the map shows its hexes, so you can see how it varies inside (near the subway vs the
   far edge). Rent, apartment size, safety and quiet are only known for the whole neighborhood.
 - Most factors are **percentiles** among residential neighborhoods (100 = best in the city).
-- Rent, commute and flood use **absolute curves**: rent against your budget,
-  minutes of commute, and the share of land that floods.
+- Rent and commute use **absolute curves**: rent against your budget and minutes of commute.
 - Crime and noise are counted **per 1,000 residents**. Amenities are counted within **walking distance**.
 - The map's overall match is the weighted average of the factors you turn on.
 

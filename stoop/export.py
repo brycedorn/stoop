@@ -43,7 +43,6 @@ METRICS = {
     "gyms_walk": ("Full-size gyms within 1 km", "int"),
     "nearest_gym_m": ("Nearest gym or studio", "m"),
     "citibike_400m": ("Citi Bike docks within 400 m", "int"),
-    "flood_share": ("Area in flood zones", "pct"),
     "pm25_ugm3": ("Fine particles PM2.5, µg/m³ (district avg)", "num"),
     "no2_ppb": ("Nitrogen dioxide NO₂, ppb (district avg)", "num"),
     "familiar_dist_m": ("Distance to an area you liked", "m"),

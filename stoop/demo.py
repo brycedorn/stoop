@@ -62,7 +62,6 @@ def make_demo(cfg: dict, seed: int = 7, step: float = 0.018):
                     "nearest_gym_m": rng.uniform(80, 1500),
                     "citibike_400m": int(rng.poisson(5 * near + 0.5)),
                     "citibike_dist_m": rng.uniform(50, 1500) * (1.3 - near),
-                    "flood_share": max(0.0, rng.normal(0.04, 0.08)),
                 })
     table = pd.DataFrame(rows).set_index("nta2020")
     scores = score_table(table, cfg, table["ntatype"] == "0")

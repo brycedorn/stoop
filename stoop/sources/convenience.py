@@ -1,4 +1,4 @@
-"""Errands, Citi Bike, and flood risk."""
+"""Errands, gyms and Citi Bike."""
 from __future__ import annotations
 
 import logging
@@ -107,25 +107,4 @@ def build_citibike(ctx) -> pd.DataFrame:
     out["citibike_400m"] = geo.to_nta(ctx.grid, geo.sum_within(cells, xy, 400), "citibike_400m")
     out["citibike_dist_m"] = geo.to_nta(ctx.grid, geo.nearest_dist(cells, xy), "citibike_dist_m")
     log.info("citibike: %d stations", len(st))
-    return out
-
-
-def build_flood(ctx) -> pd.DataFrame:
-    import geopandas as gpd
-    refresh = ctx.wants_refresh("flood")
-    layers = []
-    try:
-        layers.append(gpd.read_file(fetch.arcgis_geojson(ctx.src["stormwater_flood_arcgis"], ctx.raw, refresh)))
-    except Exception as e:
-        log.warning("stormwater flood map unavailable: %s", e)
-    try:
-        layers.append(gpd.read_file(fetch.socrata_geojson(ctx.src["nyc_open_data"], ctx.src["sandy_inundation"], ctx.raw, refresh)))
-    except Exception as e:
-        log.warning("Sandy inundation zone unavailable: %s", e)
-    if not layers:
-        raise RuntimeError("no flood layers could be loaded")
-    polys = pd.concat([l[["geometry"]].to_crs(4326) for l in layers], ignore_index=True)
-    frac = geo.area_fraction(ctx.grid, gpd.GeoDataFrame(polys, crs=4326))
-    out = pd.DataFrame(index=ctx.ntas.index)
-    out["flood_share"] = geo.to_nta(ctx.grid, frac.values, "flood_share")
     return out

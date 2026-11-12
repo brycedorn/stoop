@@ -41,7 +41,6 @@ default_weights:
   gym: 5                  # full-size gyms nearby
   airports: 3             # transit time to JFK, LaGuardia, Newark (averaged)
   citibike: 3
-  flood: 3
   size: 8
   familiarity: 0          # needs liked_neighborhoods
   runhex: 0               # needs a runner-hex file (sources.runner_hexes); never restricted third-party data
@@ -65,8 +64,6 @@ sources:
   parks: enfh-gkve                # Parks Properties
   street_trees: uvpi-gqnh         # 2015 Street Tree Census
   subway_stations: 39hk-dx4f      # MTA Subway Stations (data.ny.gov)
-  sandy_inundation: 5xsi-dfpx     # Hurricane Sandy inundation zone (uyj8-7rv5 is only a map view of it)
-  stormwater_flood_arcgis: https://services2.arcgis.com/IsDCghZ73NgoYoz5/ArcGIS/rest/services/Moderate_Current_Sea_Levels/FeatureServer/0
   citibike_stations: https://gbfs.citibikenyc.com/gbfs/en/station_information.json
   # NYC Health Environment & Health Data Portal (air quality, by community district)
   ehdp_data: https://raw.githubusercontent.com/nychealth/EHDP-data/production/indicators

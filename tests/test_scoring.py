@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from stoop import scoring
-from stoop.scoring import commute_curve, flood_curve, percentile, rent_curve, score_table, total_score
+from stoop.scoring import commute_curve, percentile, rent_curve, score_table, total_score
 
 CFG = {"you": {"max_rent": 4000}}
 
@@ -22,9 +22,8 @@ def test_rent_curve_monotonic():
     assert np.all(np.diff(rent_curve(r, 4000)) <= 1e-9)
 
 
-def test_commute_and_flood_curves():
+def test_commute_curve():
     assert list(commute_curve([10, 20, 47.5, 75, 90])) == pytest.approx([100, 100, 50, 0, 0])
-    assert list(flood_curve([0, 0.15, 0.3, 0.9])) == pytest.approx([100, 50, 0, 0])
 
 
 def test_percentile_direction_and_mask():

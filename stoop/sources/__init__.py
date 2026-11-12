@@ -16,7 +16,6 @@ STEPS = {
     "errands": convenience.build_errands,
     "gyms": convenience.build_gyms,     # full-size gyms (chains, YMCAs, rec centers) from the errands OSM cache
     "citibike": convenience.build_citibike,
-    "flood": convenience.build_flood,
     "air_quality": air_quality.build,   # PM2.5 / NO2 by community district (EHDP); detail panel only
     "familiarity": familiarity.build,   # no downloads; rerun after editing liked_neighborhoods
     "runner_hexes": runner_hexes.build,   # runner traffic by hex (sources.runner_hexes, from any tool)
