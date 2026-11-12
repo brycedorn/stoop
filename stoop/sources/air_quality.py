@@ -1,10 +1,14 @@
-"""Air quality (detail panel only, not scored): annual mean PM2.5 and NO2 by community district.
+"""Air quality: annual mean PM2.5 and NO2 by community district, plus distance from highways per grid cell.
 
 Source: NYC Health's Environment & Health Data Portal (EHDP), which publishes the NYC Community
 Air Survey (NYCCAS) estimates as JSON in github.com/nychealth/EHDP-data. Updated yearly; the latest
 year is used. The finest current geography is the community district (59 citywide), so every NTA
 in a district gets the same value. Fine for "this part of the city has dirtier air", not for
 block-level differences such as living next to a highway.
+
+Highways: the district averages can't tell a block next to an expressway from one five blocks away, and
+traffic pollution is highest within a few hundred meters of a busy road. So each grid cell also gets its distance to
+the nearest motorway or trunk road (OpenStreetMap), tunnels left out.
 
 Join: a 2020 NTA code starts with its community district ("BK0101" -> Brooklyn CD 1), and EHDP
 numbers districts borough*100 + district ("301"). Parks, airports and other non-residential
@@ -16,7 +20,9 @@ import logging
 
 import pandas as pd
 
-from .. import fetch
+import numpy as np
+
+from .. import fetch, geo, osm
 
 log = logging.getLogger("stoop.air_quality")
 NAME = "air_quality"
@@ -27,6 +33,18 @@ MEASURES = {
     "pm25_ugm3": (2023, 1425),   # Fine particles (PM2.5), annual mean, µg/m³
     "no2_ppb": (2025, 1431),     # Nitrogen dioxide, annual mean, ppb
 }
+
+
+ROAD_TAGS = {"highway": ["motorway", "motorway_link", "trunk", "trunk_link"]}
+
+
+def highway_points(ctx, refresh: bool = False) -> np.ndarray:
+    """Points every 25 m along NYC's motorways and trunk roads (meters), tunnels left out."""
+    g = osm.features(ctx, ROAD_TAGS, "highways", refresh)
+    g = g[g.geom_type.isin(["LineString", "MultiLineString"])]
+    if "tunnel" in g.columns:
+        g = g[~g["tunnel"].fillna("no").isin(["yes", "building_passage", "culvert"])]
+    return geo.lines_to_points(g.geometry.values, 25.0)
 
 
 def nta_to_cd(nta: str) -> int | None:
@@ -62,4 +80,7 @@ def build(ctx) -> pd.DataFrame:
         year, values = latest_cd_values(data, measure, periods)
         out[col] = cds.map(values).astype(float)
         log.info("air quality: %s %s for %d districts, %d NTAs filled", col, year, len(values), out[col].notna().sum())
+    pts = highway_points(ctx, refresh)
+    out["highway_dist_m"] = geo.to_nta(ctx.grid, geo.nearest_dist(geo.cell_xy(ctx.grid), pts), "highway_dist_m")
+    log.info("air quality: %d highway points; median NTA distance %.0f m", len(pts), out["highway_dist_m"].median())
     return out

@@ -14,6 +14,7 @@ neighborhoods on what matters to you, and you tune the weights live on a map.
 | Rent | Census ACS median rent by bedroom count, sharpened by listing rents if you supply them |
 | Safety | NYPD complaint data, last 12 months, per resident |
 | Quiet | 311 noise complaints, per resident |
+| Air quality | NYC Health air survey (PM2.5, NO₂) by community district, distance from highways (OSM) |
 | Green space | NYC Parks properties, 2015 street tree census |
 | Daily errands | OSM supermarkets, pharmacies, laundromats |
 | Gyms | OSM full-size gyms (Equinox, Planet Fitness, Blink, YMCA, Parks rec centers…), not boutique studios |

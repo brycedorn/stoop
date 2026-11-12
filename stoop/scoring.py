@@ -75,6 +75,12 @@ FACTORS: dict[str, dict] = {
         "help": "Citi Bike docks within 400 m.",
         "components": [("citibike_400m", +1, 0.7), ("citibike_dist_m", -1, 0.3)],
     },
+    "air": {
+        "label": "Air quality",
+        "help": "Fine particles (PM2.5) and nitrogen dioxide, yearly average for the community district (NYC Health), "
+                "plus distance from highways and expressways (OpenStreetMap): 50 m or less = 0, 400 m+ = 100.",
+        "components": [("pm25_ugm3", -1, 0.35), ("no2_ppb", -1, 0.3), ("highway_dist_m", "road", 0.35)],
+    },
     "space": {
         "label": "Breathing room",
         "help": "Lower population density. Leave at 0 if you don't mind crowds.",
@@ -142,6 +148,14 @@ def run5k_curve(minutes):
     return np.clip((RUN5K_BAD_MIN - m) / (RUN5K_BAD_MIN - RUN5K_GOOD_MIN), 0, 1) * 100
 
 
+ROAD_NEAR_M, ROAD_FAR_M = 50, 400   # traffic pollution falls to the area's background within a few hundred meters
+
+
+def road_curve(dist_m):
+    d = np.asarray(dist_m, float)
+    return np.clip((d - ROAD_NEAR_M) / (ROAD_FAR_M - ROAD_NEAR_M), 0, 1) * 100
+
+
 FAMILIAR_SCALE_M = 1500
 
 
@@ -173,6 +187,8 @@ def component_score(features: pd.DataFrame, col: str, how, mask: pd.Series, cfg:
         return pd.Series(familiar_curve(v), index=v.index)
     if how == "gym":
         return pd.Series(gym_curve(v), index=v.index)
+    if how == "road":
+        return pd.Series(road_curve(v), index=v.index)
     if how == "abs":          # already 0-100
         return v.clip(0, 100)
     if how == "airport":

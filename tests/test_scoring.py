@@ -103,3 +103,8 @@ def test_config_local_layers_on_top():
     m = merge_config(base, over)
     assert m["you"] == {"max_rent": 5000, "liked": [], "dests": [{"name": "A", "label": "Job"}]} and m["x"] == 1
     assert base["you"]["max_rent"] == 4000                   # the base isn't modified
+
+
+def test_road_curve():
+    from stoop.scoring import road_curve
+    assert list(road_curve([0, 50, 225, 400, 900])) == pytest.approx([0, 0, 50, 100, 100])

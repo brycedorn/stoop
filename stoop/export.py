@@ -45,6 +45,7 @@ METRICS = {
     "citibike_400m": ("Citi Bike docks within 400 m", "int"),
     "pm25_ugm3": ("Fine particles PM2.5, µg/m³ (district avg)", "num"),
     "no2_ppb": ("Nitrogen dioxide NO₂, ppb (district avg)", "num"),
+    "highway_dist_m": ("To the nearest highway", "m"),
     "familiar_dist_m": ("Distance to an area you liked", "m"),
     "pop": ("Population", "int"),
     "pop_density_km2": ("People per km²", "int"),

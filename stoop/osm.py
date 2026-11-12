@@ -24,7 +24,7 @@ def features(ctx, tags: dict, name: str, refresh: bool = False):
     boundary = ctx.ntas.to_crs(CRS_LL).union_all().buffer(0.002)   # ~200 m buffer catches waterfront paths
     log.info("querying OSM for %s (this can take a while the first time)...", name)
     g = ox.features_from_polygon(boundary, tags=tags)
-    keep = [c for c in ["highway", "footway", "leisure", "amenity", "shop", "name", "access", "geometry"] if c in g.columns]
+    keep = [c for c in ["highway", "footway", "leisure", "amenity", "shop", "name", "access", "tunnel", "geometry"] if c in g.columns]
     g = g[keep].reset_index(drop=True)
     for c in keep:
         if c != "geometry":

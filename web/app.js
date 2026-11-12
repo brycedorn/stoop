@@ -27,7 +27,7 @@
     { id: "cost", title: "Cost & space", keys: ["rent", "size", "space"], color: { light: "#2a78d6", dark: "#3987e5" } },
     { id: "move", title: "Getting around", keys: ["commute", "airports", "citibike", "errands"], color: { light: "#eb6834", dark: "#d95926" } },
     { id: "life", title: "Lifestyle & outdoors", keys: ["running", "run5k", "gym", "runhex", "green", "favorites", "familiarity"], color: { light: "#1baf7a", dark: "#199e70" } },
-    { id: "env", title: "Safety & environment", keys: ["safety", "quiet"], color: { light: "#6f6d68", dark: "#9a988f" } },
+    { id: "env", title: "Safety & environment", keys: ["safety", "quiet", "air"], color: { light: "#6f6d68", dark: "#9a988f" } },
   ];
   const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => g.keys.map((k) => [k, g])));
   const OTHER = { id: "other", title: "Other", keys: [], color: { light: "#6f6d68", dark: "#9a988f" } };
@@ -49,6 +49,7 @@
     airports: "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z",
     bus: "M7 3.5h10A2.5 2.5 0 0 1 19.5 6v10.5h-15V6A2.5 2.5 0 0 1 7 3.5zM4.5 11h15M7.5 20v-3.5M16.5 20v-3.5M8 14h.01M16 14h.01",
     safety: "M12 3l7.5 3v6c0 4.2-3.1 7.4-7.5 9-4.4-1.6-7.5-4.8-7.5-9V6z",
+    air: "M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8",
     quiet: "M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z",
   };
   ICON_PATHS.run5k = "M4 19c0-3.5 3-4 5.5-4S15 14 15 11s-3-3.5-3-3.5M15 3.5v8M15 3.5h5l-1.5 2.25L20 8h-5";
@@ -88,7 +89,7 @@
     Balanced: Object.fromEntries(AVAILABLE.map((k) => [k, k === "space" ? 0 : 10])),
     Runner: { running: 30, run5k: 20, runhex: 10, green: 10, commute: 15, rent: 10, gym: 5 },
     "Budget first": { rent: 40, commute: 25, size: 10, safety: 10, errands: 10, running: 5 },
-    Quiet: { quiet: 30, green: 20, safety: 20, space: 15, rent: 10, commute: 5 },
+    Quiet: { quiet: 30, green: 20, safety: 15, air: 15, space: 10, rent: 5, commute: 5 },
     Familiar: { familiarity: 30, commute: 25, rent: 20, running: 15, green: 10 },
   };
 

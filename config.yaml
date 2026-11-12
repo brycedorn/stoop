@@ -36,6 +36,7 @@ default_weights:
   rent: 20
   safety: 10
   quiet: 8
+  air: 5
   green: 8
   errands: 6
   gym: 5                  # full-size gyms nearby
