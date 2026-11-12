@@ -157,11 +157,9 @@ def subway(ctx) -> dict:
             continue
         seen.add(key)
         r = routes.loc[rid] if rid in routes.index else {}
-        color = "#" + str(r.get("route_color") or "808183").lstrip("#")
-        lines.append({"type": "Feature", "geometry": mapping(line),
-                      "properties": {"route": str(r.get("route_short_name") or rid), "color": color}})
-    for f in lines:
-        f["geometry"]["coordinates"] = [[_r(x), _r(y)] for x, y in f["geometry"]["coordinates"]]
+        color = "#" + str(r.get("route_color") or "808183").lstrip("#").upper()
+        lines.append({"coords": np.asarray(line.coords), "route": str(r.get("route_short_name") or rid), "color": color})
+    lines = subway_geometry(lines)
 
     st = fetch.socrata_rows(ctx.src["ny_state_open_data"], ctx.src["subway_stations"], ctx.raw)
     cols = {c.lower(): c for c in st.columns}
@@ -178,6 +176,38 @@ def subway(ctx) -> dict:
     stations = [list(x) for x in {(a, b, c, d) for a, b, c, d in stations}]
     log.info("layers: %d subway line shapes, %d stations", len(lines), len(stations))
     return {"lines": {"type": "FeatureCollection", "features": lines}, "stations": stations}
+
+
+def subway_geometry(lines: list[dict]) -> list[dict]:
+    """[{"coords": lon/lat array, "route", "color"}] -> GeoJSON features with rounded curves and side-by-side lanes
+    where colors share a corridor (property "off", in line widths; see transit_shapes)."""
+    from pyproj import Transformer
+    from shapely.geometry import LineString
+    from .context import CRS_M
+    from .transit_shapes import assign_lanes, smooth
+    fwd = Transformer.from_crs(CRS_LL, CRS_M, always_xy=True)
+    back = Transformer.from_crs(CRS_M, CRS_LL, always_xy=True)
+    routes = []
+    for ln in lines:
+        x, y = fwd.transform(ln["coords"][:, 0], ln["coords"][:, 1])
+        routes.append({"coords": smooth(np.column_stack([x, y])), "route": ln["route"], "color": ln["color"]})
+    # lane order: colors by their first route (1/2/3 red, 4/5/6 green, 7, A/C/E, B/D/F/M...), the same everywhere
+    first = {}
+    for ln in sorted(lines, key=lambda l: _route_key(l["route"])):
+        first.setdefault(ln["color"], len(first))
+    pieces = assign_lanes(routes, sorted(first, key=first.get))
+    out = []
+    for pc in pieces:
+        c = np.asarray(LineString(pc["coords"]).simplify(1.0).coords)   # drop points the smoothing left on straights
+        lon, lat = back.transform(c[:, 0], c[:, 1])
+        coords = [[_r(a), _r(b)] for a, b in zip(lon, lat)]
+        coords = [c for i, c in enumerate(coords) if i == 0 or c != coords[i - 1]]
+        if len(coords) >= 2:
+            out.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": coords},
+                        "properties": {"route": pc["route"], "color": pc["color"], "off": pc["off"]}})
+    shared = sum(1 for f in out if f["properties"]["off"])
+    log.info("layers: subway lines smoothed; %d of %d pieces run side by side with another color", shared, len(out))
+    return out
 
 
 def bus_stops(ctx) -> list:
