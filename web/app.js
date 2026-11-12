@@ -1429,6 +1429,7 @@
     // The grid can settle after the map is created (fonts, mobile toolbar): keep the canvas in sync.
     new ResizeObserver(() => map.resize()).observe($("mapwrap"));
     map.on("style.load", addLayers);
+    map.on("zoom", syncBusStops);
     map.on("styleimagemissing", (e) => {
       if (e.id.startsWith("rbs:") && !map.hasImage(e.id)) map.addImage(e.id, bulletsImage(e.id.slice(4)));
     });
@@ -1742,13 +1743,20 @@
     }
     if (L.subway?.lines?.features?.length) {
       map.addSource("subway-lines", { type: "geojson", data: L.subway.lines, promoteId: "route" });
+      // Where colors share a corridor each runs in its own lane, side by side like the subway map: "off" is the
+      // lane's distance from the shared center line in line widths (layers.subway_geometry), so lanes touch at
+      // every zoom. Same-color services (A/C/E) share one lane.
+      const W = [[10, 1.2], [13, 2.2], [16, 4]];
+      const off = ["coalesce", ["get", "off"], 0];
+      const byZoom = (f) => ["interpolate", ["linear"], ["zoom"], ...W.flatMap(([z, w]) => [z, f(w)])];
       map.addLayer({ id: "subway-lines", type: "line", source: "subway-lines", layout: round,
         // muted at city zoom so the lines read as structure, not as the subject; full color once you zoom in
         paint: { "line-color": ["get", "color"], "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.35, 12.5, 0.55, 14, 0.9],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.2, 13, 2.2, 16, 4] } }, beforeId);
+          "line-width": byZoom((w) => w), "line-offset": byZoom((w) => ["*", off, w]) } }, beforeId);
       map.addLayer({ id: "subway-lines-hover", type: "line", source: "subway-lines", layout: round,
         paint: { "line-color": ["get", "color"], "line-opacity": hlOpacity,
-          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 5.5, 16, 8] } }, beforeId);
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 5.5, 16, 8],
+          "line-offset": byZoom((w) => ["*", off, w]) } }, beforeId);
     }
     if (L.bus_routes?.features?.length)
       map.addLayer({ id: "bus-lines-hover", type: "line", source: "bus-lines", layout: round,
@@ -1807,6 +1815,44 @@
   }
   const TEXT_FONT = ["Noto Sans Regular"];   // a font stack OpenFreeMap serves for both basemaps
 
+  // Bus stops: at a corner the stops for each direction sit a few meters apart and stack into one blob. Until you
+  // zoom in close (BUS_SPLIT_Z) stops within BUS_GROUP_M of each other show as one marker carrying all their
+  // routes; from there in, each stop shows on its own.
+  const BUS_SPLIT_Z = 17, BUS_GROUP_M = 60;
+  let busSplit = null, busGroups = null;
+  const routeSort = (a, b) => a.localeCompare(b, "en", { numeric: true });
+  function busGrouped() {
+    if (busGroups) return busGroups;
+    const kx = 111320 * Math.cos((40.7 * Math.PI) / 180), ky = 110540, cell = BUS_GROUP_M;
+    const rows = L.bus, xy = rows.map((r) => [r[0] * kx, r[1] * ky]), grid = new Map();
+    const at = (gx, gy) => grid.get(gx + "," + gy) || [];
+    xy.forEach(([x, y], i) => { const k = Math.floor(x / cell) + "," + Math.floor(y / cell); grid.has(k) ? grid.get(k).push(i) : grid.set(k, [i]); });
+    const used = new Uint8Array(rows.length);
+    busGroups = [];
+    for (let i = 0; i < rows.length; i++) {
+      if (used[i]) continue;
+      used[i] = 1;
+      const [x, y] = xy[i], gx = Math.floor(x / cell), gy = Math.floor(y / cell), members = [i];
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++)
+        for (const j of at(gx + dx, gy + dy)) if (!used[j] && Math.hypot(xy[j][0] - x, xy[j][1] - y) <= cell) { used[j] = 1; members.push(j); }
+      const routes = [...new Set(members.flatMap((j) => String(rows[j][3] || "").split(/\s+/).filter(Boolean)))].sort(routeSort);
+      const lon = members.reduce((a, j) => a + rows[j][0], 0) / members.length, lat = members.reduce((a, j) => a + rows[j][1], 0) / members.length;
+      busGroups.push([lon, lat, rows[i][2], routes.join(" "), rows[i][4] || "", members.length]);
+    }
+    return busGroups;
+  }
+  const busFC = (split) => pointsFC(split ? L.bus : busGrouped(), (r) => ({ kind: "bus", name: r[2], routes: r[3], key: r[2], stops: r[5] || 1 }));
+  function syncBusStops() {
+    const src = map?.getSource("bus-stops");
+    if (!src) return;
+    const split = map.getZoom() >= BUS_SPLIT_Z;
+    if (split === busSplit) return;
+    busSplit = split;
+    map.removeFeatureState({ source: "bus-stops" });   // ids are regenerated with the new data
+    pointHovers = pointHovers.filter((h) => h.source !== "bus-stops");
+    src.setData(busFC(split));
+  }
+
   function addContextPoints(dark) {
     const ink = dark ? "#f0efec" : "#0b0b0b", surf = dark ? "#1a1a19" : "#ffffff", ink2 = dark ? "#c3c2b7" : "#52514e";
     const halo = dark ? "rgba(26,26,25,0.9)" : "rgba(255,255,255,0.9)";
@@ -1816,7 +1862,8 @@
           "text-size": 11, "text-keep-upright": true, "text-optional": true },
         paint: { "text-color": ink2, "text-halo-color": halo, "text-halo-width": 1.6 } });
     if (L.bus?.length) {
-      map.addSource("bus-stops", { type: "geojson", generateId: true, data: pointsFC(L.bus, (r) => ({ kind: "bus", name: r[2], routes: r[3], key: r[2] })) });
+      busSplit = map.getZoom() >= BUS_SPLIT_Z;
+      map.addSource("bus-stops", { type: "geojson", generateId: true, data: busFC(busSplit) });
       if (!map.hasImage("badge-bus")) map.addImage("badge-bus", badgeImage("bus", dark ? "#6f6d68" : "#52514e"));
       const bus = { id: "bus-stops", type: "symbol", source: "bus-stops", minzoom: 14,
         layout: { "icon-image": "badge-bus", "icon-allow-overlap": true, "icon-ignore-placement": true,
@@ -1977,7 +2024,7 @@
   function pointHtml(f) {
     const p = f.properties;
     if (p.kind === "airport") return airportCardHtml(p.key.toLowerCase(), p.name);
-    const sub = p.kind === "station" ? "Subway station" : p.kind === "bus" ? `Bus stop${p.routes ? " · " + p.routes : ""}`
+    const sub = p.kind === "station" ? "Subway station" : p.kind === "bus" ? `${p.stops > 1 ? `${p.stops} bus stops` : "Bus stop"}${p.routes ? " · " + p.routes : ""}`
       : p.kind;
     return `<div class="tn">${esc(p.name)}</div><div class="ts">${esc(sub)}</div>${p.kind === "station" ? bullets(p.routes) : ""}`;
   }
