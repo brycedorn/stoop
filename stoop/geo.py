@@ -307,6 +307,38 @@ def area_fraction(grid, polygons) -> pd.Series:
     return frac.clip(0, 1).reindex(grid.index, fill_value=0.0)
 
 
+def bin_to_cells(grid, pts: np.ndarray, weights=None, max_m: float = 250.0) -> np.ndarray:
+    """Total point weight per grid cell (each point goes to the nearest cell center; points farther than `max_m`
+    from every cell, out on the water or past the city line, are dropped)."""
+    out = np.zeros(len(grid))
+    if len(pts) == 0:
+        return out
+    w = np.ones(len(pts)) if weights is None else np.asarray(weights, float)
+    d, i = cKDTree(cell_xy(grid)).query(pts)
+    ok = d <= max_m
+    return np.bincount(i[ok], weights=w[ok], minlength=len(grid)).astype(float)
+
+
+def smooth_cells(grid, per_cell: np.ndarray, scale: float) -> np.ndarray:
+    """Gaussian-weighted sum of a per-cell quantity over nearby cells (`scale` meters ~ 0.37 weight)."""
+    xy = cell_xy(grid)
+    return decay_sum(xy, xy, scale, weights=np.asarray(per_cell, float))
+
+
+def local_ratio(grid, num: np.ndarray, den: np.ndarray, prior_ratio: np.ndarray, prior_den: float, scale: float) -> np.ndarray:
+    """Per-cell ratio of two smoothed per-cell totals (e.g. complaints / residents), pulled toward `prior_ratio`
+    (the cell's neighborhood value) as if `prior_den` more units of the denominator had that ratio. Where few
+    people live, the cell stays close to its neighborhood instead of swinging on a handful of events."""
+    n, d = smooth_cells(grid, num, scale), smooth_cells(grid, den, scale)
+    return (n + prior_den * np.asarray(prior_ratio, float)) / (d + prior_den)
+
+
+def keep_cells(grid, values, name: str) -> None:
+    """Keep a per-cell value for the hex view (while collect_cells is on) without touching any neighborhood value."""
+    if _CELLS is not None:
+        _CELLS[name] = pd.Series(np.asarray(values, float), index=grid.index).astype("float32")
+
+
 _CELLS: dict | None = None   # per-cell values kept while a step runs (collect_cells)
 
 

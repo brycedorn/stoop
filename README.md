@@ -80,7 +80,8 @@ python -m stoop run --steps rent,safety,quiet,citibike --refresh rent,safety,qui
   (paths within 1 km, the nearest supermarket, and so on). Hexes are then
   averaged into neighborhoods, weighted by how many people live in each one.
 - Select a neighborhood and the map shows its hexes, so you can see how it varies inside (near the subway vs the
-  far edge). Rent, apartment size, safety and quiet are only known for the whole neighborhood.
+  far edge). Safety, quiet and apartment size are local averages over the surrounding few hundred meters, pulled
+  toward the neighborhood where few people live; rent is only known for the whole neighborhood.
 - Most factors are **percentiles** among residential neighborhoods (100 = best in the city).
 - Rent and commute use **absolute curves**: rent against your budget and minutes of commute.
 - Crime and noise are counted **per 1,000 residents**. Amenities are counted within **walking distance**.

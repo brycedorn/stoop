@@ -3,6 +3,11 @@
 Both are counted by the NTA the incident falls in, over the last `lookback_days`,
 and divided by max(population, 2,000) so near-empty NTAs don't blow up.
 Felonies weigh 3, misdemeanors 1, violations 0.25.
+
+For the hex view, each spot gets the same rate over its surroundings: incidents and residents within a few hundred
+meters (Gaussian, LOCAL_SCALE_M), pulled toward the neighborhood's rate as if PRIOR_RESIDENTS more people lived
+there at that rate. A block next to a busy precinct-house corner reads worse than a quiet side street, and a park
+or rail yard with almost no residents stays near its neighborhood instead of reading as a crime hot spot.
 """
 from __future__ import annotations
 
@@ -18,6 +23,17 @@ log = logging.getLogger("stoop.safety")
 POP_FLOOR = 2000
 NOISE_CAP_PER_YEAR = 52   # max complaints counted per exact location (~1/week): one chronic caller can't dominate an area
 LAW_WEIGHTS = {"FELONY": 3.0, "MISDEMEANOR": 1.0, "VIOLATION": 0.25}
+LOCAL_SCALE_M = 250
+PRIOR_RESIDENTS = 1500
+
+
+def keep_local_rate(ctx, xy: np.ndarray, weights: np.ndarray, nta_per_1k: pd.Series, name: str) -> None:
+    """Per-spot rate per 1,000 residents for the hex view (neighborhood values are unchanged)."""
+    grid = ctx.grid
+    events = geo.bin_to_cells(grid, xy, weights)
+    prior = grid["nta2020"].map(nta_per_1k / 1000).fillna(float(np.nanmedian(nta_per_1k)) / 1000).values
+    rate = geo.local_ratio(grid, events, grid["pop"].values, prior, PRIOR_RESIDENTS, LOCAL_SCALE_M) * 1000
+    geo.keep_cells(grid, rate, name)
 
 
 def _cutoff(ctx) -> str:
@@ -54,6 +70,7 @@ def build_safety(ctx) -> pd.DataFrame:
     out = pd.DataFrame(index=ctx.ntas.index)
     out["crime_weighted_per_1k"] = per_1k(counts, pop)
     out["felonies_per_1k"] = per_1k(felonies, pop)
+    keep_local_rate(ctx, xy, w, out["crime_weighted_per_1k"], "crime_weighted_per_1k")
     log.info("safety: %d complaints since %s", len(df), _cutoff(ctx)[:10])
     return out
 
@@ -91,6 +108,7 @@ def build_quiet(ctx) -> pd.DataFrame:
     xy = geo.to_xy(weights.index.get_level_values("longitude"), weights.index.get_level_values("latitude"))
     out = pd.DataFrame(index=ctx.ntas.index)
     out["noise_per_1k"] = per_1k(geo.count_in_nta(ctx.ntas, xy, weights=weights.to_numpy()), _pop(ctx))
+    keep_local_rate(ctx, xy, weights.to_numpy(), out["noise_per_1k"], "noise_per_1k")
     return out
 
 
