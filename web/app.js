@@ -17,6 +17,8 @@
   const STORE_KEY = "stoop.state.v2";
   const SHORT_KEY = "stoop.shortlist.v1";
   const MOBILE = () => matchMedia("(max-width: 860px)").matches;
+  const TOUCH = () => matchMedia("(hover: none)").matches;   // no hover: taps show map details
+  const DOCKED = () => matchMedia("(max-width: 1180px) and (min-width: 861px)").matches;   // details replace the list
 
   // Factor groups: the tag color says which group, the icon says which factor, the text says it in words.
   // Three hues only: dataviz's categorical slots 1-3 are the set that passes all-pairs (validate_palette.js
@@ -25,7 +27,7 @@
     { id: "cost", title: "Cost & space", keys: ["rent", "size", "space"], color: { light: "#2a78d6", dark: "#3987e5" } },
     { id: "move", title: "Getting around", keys: ["commute", "airports", "citibike", "errands"], color: { light: "#eb6834", dark: "#d95926" } },
     { id: "life", title: "Lifestyle & outdoors", keys: ["running", "run5k", "gym", "runhex", "green", "favorites", "familiarity"], color: { light: "#1baf7a", dark: "#199e70" } },
-    { id: "env", title: "Safety & environment", keys: ["safety", "quiet", "flood"], color: { light: "#6f6d68", dark: "#9a988f" } },
+    { id: "env", title: "Safety & environment", keys: ["safety", "quiet"], color: { light: "#6f6d68", dark: "#9a988f" } },
   ];
   const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => g.keys.map((k) => [k, g])));
   const OTHER = { id: "other", title: "Other", keys: [], color: { light: "#6f6d68", dark: "#9a988f" } };
@@ -48,7 +50,6 @@
     bus: "M7 3.5h10A2.5 2.5 0 0 1 19.5 6v10.5h-15V6A2.5 2.5 0 0 1 7 3.5zM4.5 11h15M7.5 20v-3.5M16.5 20v-3.5M8 14h.01M16 14h.01",
     safety: "M12 3l7.5 3v6c0 4.2-3.1 7.4-7.5 9-4.4-1.6-7.5-4.8-7.5-9V6z",
     quiet: "M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z",
-    flood: "M3 15c2.2 0 2.2-2 4.5-2s2.3 2 4.5 2 2.2-2 4.5-2 2.3 2 4.5 2M3 19.5c2.2 0 2.2-2 4.5-2s2.3 2 4.5 2 2.2-2 4.5-2 2.3 2 4.5 2M12 3v6M9.5 6.5 12 9l2.5-2.5",
   };
   ICON_PATHS.run5k = "M4 19c0-3.5 3-4 5.5-4S15 14 15 11s-3-3.5-3-3.5M15 3.5v8M15 3.5h5l-1.5 2.25L20 8h-5";
   ICON_PATHS.runhex = "M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5zM8 13.5c1.5 0 1.2-3 3-3s1.5 3 3 3 1.2-3 2-3";
@@ -58,7 +59,7 @@
     `<span class="tag${weak ? " weak" : ""}" style="--tc:${groupColor(k)}" title="${esc(META.factors[k]?.label || k)}">${icon(k)}${weak ? "low " : ""}${esc(text ?? short(k))}</span>`;
   const SHORT = {
     favorites: "Your places", gym: "Gyms", airports: "Airports", runhex: "Runner traffic", run5k: "5K routes", familiarity: "Familiar area", size: "Apartment size",
-    space: "Breathing room", citibike: "Citi Bike", errands: "Errands", flood: "Flood safety", green: "Green space",
+    space: "Breathing room", citibike: "Citi Bike", errands: "Errands", green: "Green space",
   };
   const short = (k) => SHORT[k] || META.factors[k].label;
 
@@ -106,7 +107,7 @@
   state.boroughs = new Set(state.boroughs);
   let shortlist = [];
   // Commute destinations (draggable pins). Start from config.yaml; edits live in this browser.
-  // Commute is scored to ONE place (config you.commute_to); the others stay on the map as gray pins to switch to.
+  // Commute is scored to ONE place (config you.commute_to); the others are switched to from the "Commute to" menu.
   const DEST_KEY = "stoop.dests.v2";   // v1 had every destination ticked (an average); start fresh
   const DEST_SEEN_KEY = "stoop.dests.seen.v1";   // config destination names already offered in this browser
   const ACTIVE0 = Number.isInteger(META.commute_to) ? META.commute_to : 0;
@@ -385,6 +386,7 @@
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linejoin="round" d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>';
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>';
   const CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
   const ALERT = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>';
 
@@ -742,7 +744,7 @@
       if (!n) return;
       const preset = PRESETS[n] || META.weights;
       for (const k of FACTORS) state.weights[k] = AVAILABLE.includes(k) ? preset[k] || 0 : state.weights[k] || 0;
-      syncWeights(); update();
+      syncWeights(true); update();
     };
     const groups = [...GROUPS, { ...OTHER, keys: FACTORS.filter((k) => !GROUP_OF[k]) }];
     $("weights").innerHTML = groups.map((g) => {
@@ -762,9 +764,10 @@
       const k = e.target.id.replace("w-", "");
       if (!FACTORS.includes(k)) return;
       state.weights[k] = +e.target.value;
-      syncShares(); schedule();
+      syncShares(); renderRank(true); schedule();
     };
-    $("reset").onclick = () => { state.weights = { ...META.weights }; syncWeights(); update(); };
+    $("reset").onclick = () => { state.weights = { ...META.weights }; syncWeights(true); update(); };
+    bindRank();
     syncWeights();
   }
   function syncShares() {
@@ -784,9 +787,186 @@
         Object.fromEntries(AVAILABLE.map((k) => [k, p[k] || 0])))));
     }
   }
-  function syncWeights() {
+  function syncWeights(animate) {
     for (const k of FACTORS) $("w-" + k).value = state.weights[k] || 0;
     syncShares();
+    renderRank(animate);
+  }
+
+  // ---------- priorities as a ranked list: drag (or arrow keys) to order; rank sets the weight ----------
+  // Top counts most; weights fall off down the list. Factors below the "doesn't matter" line weigh 0.
+  // The sliders under "Fine-tune" still set exact weights; the list re-sorts to match them.
+  const RANK_WEIGHTS = [30, 22, 16, 12, 9, 7, 5, 4, 3, 2];
+  const rankWeight = (i) => RANK_WEIGHTS[i] ?? 2;
+  const GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+  let rankDrag = null;   // the drag in progress, if any
+
+  // current order from the weights: on factors by weight (ties keep the usual order), then the off ones
+  function rankOrder() {
+    const on = AVAILABLE.filter((k) => (state.weights[k] || 0) > 0)
+      .sort((a, b) => (state.weights[b] || 0) - (state.weights[a] || 0) || FACTORS.indexOf(a) - FACTORS.indexOf(b));
+    const off = AVAILABLE.filter((k) => !((state.weights[k] || 0) > 0));
+    return { on, off };
+  }
+  function renderRank(animate) {
+    const list = $("rank");
+    if (!list || rankDrag) return;
+    const before = animate ? rankRects() : null;
+    const { on, off } = rankOrder();
+    const pct = pctShares(on.map((k) => state.weights[k] || 0));
+    const item = (k, i, isOn) => `<li class="rk${isOn ? "" : " rk-off"}" data-k="${k}" style="--tc:${groupColor(k)}">
+        <button class="rk-grip" type="button" aria-label="${esc(META.factors[k].label)}: ${isOn ? `rank ${i + 1} of ${on.length}` : "doesn't matter"}. Use arrow keys to move.">${GRIP}</button>
+        <span class="wic">${icon(k)}</span>
+        <span class="rk-name" title="${esc(META.factors[k].help)}">${esc(META.factors[k].label)}</span>
+        <span class="rk-share">${isOn ? pct[i] + "%" : ""}</span></li>`;
+    list.innerHTML = on.map((k, i) => item(k, i, true)).join("") +
+      `<li class="rk-line" data-line aria-hidden="true"><span>Doesn't matter</span></li>` +
+      off.map((k) => item(k, 0, false)).join("");
+    if (before) flipFrom(before);
+  }
+  const rankRects = () => new Map([...$("rank").children].map((el) => [el.dataset.k || "line", el.getBoundingClientRect().top]));
+  // FLIP: every item that moved slides from where it was, with a little overshoot
+  function flipFrom(before, skip) {
+    if (!motionMs(1)) return;
+    for (const el of $("rank").children) {
+      if (el === skip) continue;
+      const was = before.get(el.dataset.k || "line");
+      if (was == null) continue;
+      const dy = was - el.getBoundingClientRect().top;
+      if (Math.abs(dy) < 1) continue;
+      el.style.transition = "none";
+      el.style.transform = `translateY(${dy}px)`;
+      el.getBoundingClientRect();   // apply the start position before transitioning away from it
+      el.style.transition = "transform .32s cubic-bezier(.34, 1.56, .64, 1)";
+      el.style.transform = "";
+    }
+  }
+  // the list's DOM order -> weights (rank weights for items above the line, 0 below)
+  function commitRank(movedKey) {
+    let i = 0, below = false;
+    for (const el of $("rank").children) {
+      if (el.dataset.line != null) { below = true; continue; }
+      state.weights[el.dataset.k] = below ? 0 : rankWeight(i++);
+    }
+    syncWeights(); schedule();
+    if (movedKey) {
+      const { on } = rankOrder(), r = on.indexOf(movedKey);
+      $("rankLive").textContent = `${META.factors[movedKey].label}: ${r >= 0 ? `rank ${r + 1} of ${on.length}` : "doesn't matter"}`;
+    }
+  }
+
+  // Drag: the card lifts, follows the pointer with a little sideways give, and tilts with its speed (a spring);
+  // the others slide out of its way; on release it springs into its slot with a small bounce.
+  function bindRank() {
+    const list = $("rank");
+    list.addEventListener("pointerdown", (e) => {
+      const el = e.target.closest(".rk");
+      if (!el || e.button > 0) return;
+      // touch drags only from the grip, so the list still scrolls under a finger
+      if (e.pointerType === "touch" && !e.target.closest(".rk-grip")) return;
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      rankDrag = { el, id: e.pointerId, grabY: e.clientY - r.top, x0: e.clientX, y: e.clientY, x: e.clientX,
+        lastY: e.clientY, vy: 0, tilt: 0, tiltV: 0, ty: 0, tx: 0, raf: 0, moved: false };
+      list.setPointerCapture(e.pointerId);   // on the list: the card itself moves in the DOM, which drops capture
+      el.classList.add("dragging");
+      list.classList.add("sorting");
+      rankDrag.raf = requestAnimationFrame(rankFrame);
+    });
+    list.addEventListener("pointermove", (e) => {
+      const d = rankDrag;
+      if (!d || e.pointerId !== d.id) return;
+      d.y = e.clientY; d.x = e.clientX;
+      if (Math.abs(d.y - d.lastY) > 2) d.moved = true;
+      rankReorder(d);
+    });
+    const end = (e) => {
+      const d = rankDrag;
+      if (!d || e.pointerId !== d.id || d.ending) return;
+      d.ending = true;
+      cancelAnimationFrame(d.raf);
+      if (list.hasPointerCapture?.(e.pointerId)) list.releasePointerCapture(e.pointerId);
+      settleRank(d);
+    };
+    list.addEventListener("pointerup", end);
+    list.addEventListener("pointercancel", end);
+    list.addEventListener("lostpointercapture", end);   // released outside the window: still settle into place
+    // keyboard: arrows move the focused item one step (across the line too)
+    list.addEventListener("keydown", (e) => {
+      const grip = e.target.closest(".rk-grip");
+      if (!grip || !["ArrowUp", "ArrowDown"].includes(e.key)) return;
+      e.preventDefault();
+      const el = grip.closest(".rk"), k = el.dataset.k;
+      const target = e.key === "ArrowUp" ? el.previousElementSibling : el.nextElementSibling;
+      if (!target) return;
+      const before = rankRects();
+      if (e.key === "ArrowUp") list.insertBefore(el, target); else list.insertBefore(target, el);
+      flipFrom(before);
+      commitRank(k);
+      renderRank();
+      list.querySelector(`.rk[data-k="${k}"] .rk-grip`)?.focus();
+    });
+  }
+  // the slot under the card's middle: insert before the first sibling whose middle is below it
+  function rankReorder(d) {
+    const list = $("rank"), mid = d.y - d.grabY + d.el.offsetHeight / 2;
+    const sibs = [...list.children].filter((c) => c !== d.el);
+    const next = sibs.find((c) => { const b = c.getBoundingClientRect(); return mid < b.top + b.height / 2; }) || null;
+    if (next === d.el.nextElementSibling) return;
+    const before = rankRects();
+    list.insertBefore(d.el, next);
+    flipFrom(before, d.el);
+  }
+  function rankFrame() {
+    const d = rankDrag;
+    if (!d || d.ending) return;
+    // near the pane's top or bottom edge, scroll it (faster the closer you get) so the whole list is reachable
+    const pane = d.el.closest(".pane"), pr = pane?.getBoundingClientRect(), EDGE = 56;
+    if (pr) {
+      const push = d.y > pr.bottom - EDGE ? d.y - (pr.bottom - EDGE) : d.y < pr.top + EDGE ? d.y - (pr.top + EDGE) : 0;
+      if (push) {
+        const before = pane.scrollTop;
+        pane.scrollTop += Math.max(-16, Math.min(16, push * 0.35));
+        if (pane.scrollTop !== before) { d.moved = true; rankReorder(d); }
+      }
+    }
+    const still = !motionMs(1);
+    // where the card sits in the layout now, so the transform keeps it under the pointer
+    const natural = d.el.getBoundingClientRect().top - d.ty;
+    d.ty = d.y - d.grabY - natural;
+    d.tx = still ? 0 : Math.max(-14, Math.min(14, (d.x - d.x0) * 0.18));   // a little sideways give
+    d.vy = d.vy * 0.7 + (d.y - d.lastY) * 0.3; d.lastY = d.y;
+    // tilt: a damped spring toward an angle set by the speed (and the sideways pull)
+    const target = still ? 0 : Math.max(-5, Math.min(5, d.vy * 0.35 + d.tx * 0.12));
+    d.tiltV = (d.tiltV + (target - d.tilt) * 0.22) * 0.72;
+    d.tilt += d.tiltV;
+    d.el.style.transition = "none";
+    d.el.style.transform = `translate(${d.tx}px, ${d.ty}px) rotate(${d.tilt}deg) scale(${still ? 1 : 1.03})`;
+    d.raf = requestAnimationFrame(rankFrame);
+  }
+  // release: spring the card from where it is into its slot (overshoot, then settle), then commit
+  function settleRank(d) {
+    const el = d.el, k = el.dataset.k;
+    const finish = () => {
+      el.style.transform = ""; el.style.transition = "";
+      el.classList.remove("dragging");
+      $("rank").classList.remove("sorting");
+      rankDrag = null;
+      if (d.moved) commitRank(k);
+      renderRank();
+    };
+    if (!motionMs(1)) return finish();
+    let ty = d.y - d.grabY - (el.getBoundingClientRect().top - d.ty), tx = d.tx, rot = d.tilt, v = 0, vx = 0, vr = 0, s = 1.03;
+    const step = () => {
+      v = (v - ty * 0.2) * 0.68; ty += v;
+      vx = (vx - tx * 0.2) * 0.68; tx += vx;
+      vr = (vr - rot * 0.25) * 0.6; rot += vr;
+      s += (1 - s) * 0.3;
+      el.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg) scale(${s})`;
+      if (Math.abs(ty) + Math.abs(v) + Math.abs(tx) + Math.abs(rot) > 0.3) requestAnimationFrame(step);
+      else finish();
+    };
+    requestAnimationFrame(step);
   }
 
   // ---------- legend ----------
@@ -798,12 +978,13 @@
   }
   function renderLegend() {
     const ramp = RAMP[theme()];
-    const lo = state.fixedScale ? [0, ...thresholds]
-      : [Math.min(...results.filter((r) => r.visible).map(colorValue).filter((v) => v != null)), ...thresholds];
-    const ticks = lo.map((v) => (Number.isFinite(v) ? Math.round(v) : "–"));
+    const vis = results.filter((r) => r.visible).map(colorValue).filter((v) => v != null);
+    const banded = state.fixedScale || vis.length < 10;   // too few matches to split into fifths
+    const lo = banded ? [0, ...thresholds] : [Math.min(...vis), ...thresholds];
+    const ticks = lo.map((v) => Math.round(v));
     const html = `<div class="swatches">${ramp.map((c) => `<span style="background:${c}"></span>`).join("")}</div>
       <div class="ticks">${ticks.map((t) => `<span>${t}+</span>`).join("")}</div>
-      <div class="legend-foot"><span>${state.fixedScale ? "20-point bands" : "Fifths of your matches"}</span>
+      <div class="legend-foot"><span>${banded ? "20-point bands" : "Fifths of your matches"}</span>
         <label title="Keep each shade's meaning fixed while you filter"><input type="checkbox" id="fixedScale" ${state.fixedScale ? "checked" : ""}>Fixed scale</label></div>`;
     if ($("legend")._html !== html) { $("legend").innerHTML = html; $("legend")._html = html; }
   }
@@ -817,6 +998,8 @@
       <div class="lm-row key"><span class="key-ic"><span class="pin short">${STAR}</span></span>On your shortlist</div>
       <div class="lm-row key"><span class="key-ic"><span class="sw sw-short"></span></span>Shortlisted, outside your must-haves</div>
       <div class="lm-row key"><span class="key-ic"><span class="sw sw-out"></span></span>Outline only: outside your must-haves</div>
+      ${HX ? `<div class="lm-row key"><span class="key-ic"><span class="sw sw-hexes"></span></span>Hexes: spots ~260 m wide inside the open area${HX.inherited.length ? `; ${esc(listJoin(HX.inherited.filter((k) => AVAILABLE.includes(k)).map((k) => META.factors[k].label.toLowerCase())))} are area-wide` : ""}</div>
+      <div class="lm-row key"><span class="key-ic"><span class="sw sw-hexes few"></span></span>Faded hex: few residents (park, industry, rail)</div>` : ""}
       <div class="lm-row key"><span class="key-ic"><span class="dest-mini">${BRIEFCASE}</span></span>Commute destination: drag to move</div>`;
   }
   function bindLegend() {
@@ -850,9 +1033,7 @@
         rentIsEstimate(p) ? "Estimate from Census data" : "Median asking (listings)"],
       ["Commute", mins != null ? `${commuteIsEstimate(p) ? "~" : ""}${Math.round(mins)} min` : "—",
         `${nd > 1 ? `Avg to ${nd} destinations` : nd === 1 ? `To ${dests.find((d) => d.on).name}` : "No destination set"}${commuteIsEstimate(p) ? (p.commutes ? " · estimate, adjusted to routed times" : " · rough estimate") : ""}`],
-      ["Apartment size", m.unit_sqft != null ? fmtInt(m.unit_sqft) + " ft²" : "—", "Avg per unit, gross"],
-      ["Paths within 1 km", m.run_path_m != null ? (m.run_path_m / 1000).toFixed(1) + " km" : "—", "Footpaths, greenways, tracks"],
-    ];
+    ];   // the two must-haves; size, paths and the rest are under "All numbers"
     const { pos, neg } = strengths(r);
     const summary = r.parts.length && (pos.length || neg.length)
       ? `<div class="tags">${pos.map((x) => tag(x.k)).join("")}${neg.map((x) => tag(x.k, { weak: true })).join("")}</div>` : "";
@@ -877,6 +1058,8 @@
       .map(([k, d]) => `<tr><td>${esc(k === "rent_est" ? `Median ${bedLabel(state.bedrooms)} rent` : d.label)}</td><td>${esc(fmtMetric(shown[k], d.fmt))}</td></tr>`).join("");
 
     const html = `
+      <button class="d-grab" type="button" id="grabDetail" aria-label="${box.classList.contains("full") ? "Show less" : "Show more"}"></button>
+      <button class="d-back" type="button" id="backDetail">${BACK}Matches</button>
       <div class="d-head">
         <div class="d-title"><h2>${esc(p.name)}</h2>
           <div class="d-sub">${esc(p.borough)}${r.rank ? ` · #${r.rank} of ${results.filter((x) => x.rank).length} matches` : ""}</div></div>
@@ -891,7 +1074,9 @@
         ${summary}
         ${composition}
         <div class="contrib contrib-head"><span>Factor</span><span>Score</span><span></span><span>Weight</span></div>
-        ${r.parts.map((x) => contribRow(x.k, x.score, x.pct, false)).join("")}
+        ${r.parts.slice(0, TOP_FACTORS).map((x) => contribRow(x.k, x.score, x.pct, false)).join("")}
+        ${r.parts.length > TOP_FACTORS ? `<details class="more"><summary>Show all ${r.parts.length} weighted factors</summary>
+          ${r.parts.slice(TOP_FACTORS).map((x) => contribRow(x.k, x.score, x.pct, false)).join("")}</details>` : ""}
         ${unweighted.length ? `<details class="more"><summary>Not weighted (${unweighted.length})</summary>
           ${unweighted.map((k) => contribRow(k, r.s[k], null, true)).join("")}</details>` : ""}
       </div>
@@ -912,6 +1097,8 @@
     }
     box.hidden = false;
     $("closeDetail").onclick = () => select(null);
+    $("backDetail").onclick = () => select(null);
+    $("grabDetail").onclick = () => { box.classList.toggle("full"); $("grabDetail").setAttribute("aria-label", box.classList.contains("full") ? "Show less" : "Show more"); };
     box.querySelector("[data-star]").onclick = () => toggleStar(r.id);
     box.querySelectorAll("[data-air]").forEach((b) => { b.onclick = () => pinAirport(b.dataset.air); });
     const hexBtn = box.querySelector("[data-hexes]");
@@ -921,6 +1108,7 @@
       applyLayerVisibility(); renderLayersMenu(); renderDetail();
     };
   }
+  const TOP_FACTORS = 5;   // the detail panel lists the biggest contributors first; the rest fold away
   const listJoin = (xs) => (xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1]);
   // The spread inside the area (lived-in hexes only) and a switch for the hex map
   function hexNoteHtml(r) {
@@ -928,12 +1116,11 @@
     if (!rows?.length) return "";
     const vals = rows.map((row) => evalHex(row, r)).filter((h) => !h.few && h.total != null).map((h) => h.total);
     const on = layerOn.hexes;
-    const wide = HX.inherited.filter((k) => AVAILABLE.includes(k)).map((k) => META.factors[k].label);
     const spread = vals.length > 1
       ? `Varies from <b>${Math.round(Math.min(...vals))}</b> to <b>${Math.round(Math.max(...vals))}</b> across ${vals.length} spots ~260 m wide`
       : "Too small to split into spots";
-    return `<div class="hex-note"><div>${spread}.${on ? " Hover the hexes on the map." : ""}
-      ${wide.length ? `<span class="n">${esc(listJoin(wide))} ${wide.length > 1 ? "are" : "is"} the same everywhere in the area.</span>` : ""}</div>
+    return `<div class="hex-note"><div>${spread}.${on ? (TOUCH() ? " Tap a hex on the map for its details." : " Hover the hexes on the map.") : ""}
+</div>
       <button class="btn sm" type="button" data-hexes aria-pressed="${on}">${on ? "Hide" : "Show"} on map</button></div>`;
   }
 
@@ -964,13 +1151,20 @@
   // MTA route bullets in the line's own color (yellow lines take black text, as on the signs)
   let ROUTE_COLOR = null;   // built on first use (the layer data is read further down)
   const routeColor = (r) => (ROUTE_COLOR ||= Object.fromEntries((L.subway?.lines?.features || []).map((f) => [f.properties.route, f.properties.color])))[r];
+  // White text, as on the signs, unless the line color is too light for it (under 3:1: the lime G, the yellow lines)
+  function bulletInk(hex) {
+    const ch = [1, 3, 5].map((i) => parseInt(String(hex).slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    const lum = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+    return 1.05 / (lum + 0.05) < 3 ? "#0b0b0b" : "#fff";
+  }
   function bullets(routes) {
     const list = String(routes || "").split(/[\s,]+/).filter(Boolean);
     const shown = list.filter((r) => !(r.endsWith("X") && list.includes(r.slice(0, -1))));
     if (!shown.length) return "";
     return `<span class="rbs" role="img" aria-label="${esc(shown.length > 1 ? "Lines " + shown.join(", ") : "Line " + shown[0])}">${shown.map((r) => {
       const c = routeColor(r) || routeColor(r.replace(/X$/, "")) || "#7C858C";
-      return `<span class="rb" style="background:${c};color:${c.toUpperCase() === "#F6BC26" ? "#0b0b0b" : "#fff"}">${esc(r.replace(/X$/, ""))}</span>`;
+      return `<span class="rb" style="background:${c};color:${bulletInk(c)}">${esc(r.replace(/X$/, ""))}</span>`;
     }).join("")}</span>`;
   }
   function nearbyHtml(p, m) {
@@ -1110,7 +1304,7 @@
 
   // ---------- map ----------
   // Sources behind the scores and layers (OpenStreetMap is credited by the basemap's own attribution)
-  const CREDITS = ["NYC Open Data", "U.S. Census Bureau", "MTA", "NYC Health", "Citi Bike"].join(" · ");
+  const CREDITS = "Data: NYC Open Data, U.S. Census, MTA, NYC Health, Citi Bike";
   let map = null, styleReady = false, pins = new Map(), lastPins = "";
   function initMap() {
     if (!window.maplibregl) {
@@ -1123,6 +1317,8 @@
       attributionControl: { compact: true, customAttribution: CREDITS },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    // Phones: the credits start collapsed to the (i) button (tap to read them), so they don't sit on the legend
+    map.once("load", () => { if (MOBILE()) document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"); });
     // The grid can settle after the map is created (fonts, mobile toolbar): keep the canvas in sync.
     new ResizeObserver(() => map.resize()).observe($("mapwrap"));
     map.on("style.load", addLayers);
@@ -1133,49 +1329,28 @@
     // Mice can fire mousemove several times per frame; only the latest position each frame is worth querying.
     let moveEv = null;
     map.on("mousemove", (e) => { if (!moveEv) requestAnimationFrame(onMove); moveEv = e; });
+    // Everything under the pointer counts: stacked points, the lines through them, the park, the open
+    // neighborhood's hex and the neighborhood itself all show their hover state and share one tooltip, in this order.
     function onMove() {
       const e = moveEv;
       moveEv = null;
       if (!e || !styleReady) return;
-      const pts = map.queryRenderedFeatures(e.point, { layers: POINT_LAYERS.filter((id) => map.getLayer(id)) });
-      setPointHover(pts[0] || null);
-      if (pts.length) {
-        setHover(null, true);
-        map.getCanvas().style.cursor = state.addingDest ? "crosshair" : "default";
-        const p = pts[0].properties;
-        setLineHover(p.kind === "station" ? p.routes : "", p.kind === "bus" ? p.routes : "");
-        hoverAirport(p.kind === "airport" ? p.key.toLowerCase() : null);
-        return overlayTooltip(pts[0], e.point);
-      }
-      const lineLayers = ["subway-lines", "bus-lines"].filter((id) => map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none");
-      const lines = lineLayers.length ? map.queryRenderedFeatures([[e.point.x - 4, e.point.y - 4], [e.point.x + 4, e.point.y + 4]], { layers: lineLayers }) : [];
-      if (lines.length) {
-        setHover(null, true);
-        map.getCanvas().style.cursor = state.addingDest ? "crosshair" : "default";
-        const uniq = (src) => [...new Map(lines.filter((f) => f.source === src).map((f) => [f.properties.route, f.properties])).values()];
-        const sub = uniq("subway-lines"), bus = uniq("bus-lines");
-        setLineHover(sub.map((x) => x.route).join(" "), bus.map((x) => x.route).join(" "));
-        return lineTooltip(sub, bus, e.point);
-      }
-      setLineHover("", "");
-      hoverAirport(null);
-      const hx = hexAt(e.point);
-      setHexHover(hx ? hx.id : null);
-      if (hx) {
-        setHover(null, true);
-        map.getCanvas().style.cursor = state.addingDest ? "crosshair" : "default";
-        return hexTooltip(hx, e.point, parkAt(e.point)?.properties);
-      }
-      const f = map.queryRenderedFeatures(e.point, { layers: ["fill"] })[0];
-      if (f) {
-        map.getCanvas().style.cursor = state.addingDest ? "crosshair" : "pointer";
-        setHover(f.id, true);
-        return showTooltip(f.id, e.point, parkAt(e.point)?.properties);
-      }
-      map.getCanvas().style.cursor = state.addingDest ? "crosshair" : "";
-      setHover(null, true); $("tooltip").hidden = true;
+      const hits = hitsAt(e.point);
+      setPointHovers(hits.points);
+      const air = hits.points.find((f) => f.properties.kind === "airport");
+      hoverAirport(air ? air.properties.key.toLowerCase() : null);
+      setLineHover([...hits.sub.map((x) => x.route), ...hits.points.filter((f) => f.properties.kind === "station").map((f) => f.properties.routes)].join(" "),
+        [...hits.bus.map((x) => x.route), ...hits.points.filter((f) => f.properties.kind === "bus").map((f) => f.properties.routes)].join(" "));
+      setParkHover(hits.park ? hits.park.properties.pid : null);
+      setHexHover(hits.hex ? hits.hex.id : null);
+      setHover(hits.hood && !hits.hex ? hits.hood.id : null, true);   // inside the open area, the hex is the spot
+      const clickable = hits.points.length || hits.park || (hits.hood && !hits.hex);
+      map.getCanvas().style.cursor = state.addingDest ? "crosshair" : clickable ? "pointer" : "";
+      renderTooltip(hits, e.point);
     }
-    map.getCanvas().addEventListener("mouseleave", () => { moveEv = null; setHover(null, true); setPointHover(null); setLineHover("", ""); setHexHover(null); $("tooltip").hidden = true; });
+    // A touch ends with the pointer "leaving": keep a tapped card open (only a real mouse leaving clears hover)
+    map.getCanvas().addEventListener("pointerleave", (ev) => { if (ev.pointerType === "touch") return; moveEv = null; setHover(null, true); setPointHovers([]); setLineHover("", "");
+      setHexHover(null); setParkHover(null); hoverAirport(null); $("tooltip").hidden = true; });
     // One click handler: either drop a destination (add mode) or select the neighborhood under the pointer
     map.on("click", (e) => {
       if (state.pickingArea) {
@@ -1196,9 +1371,13 @@
       const park = parkAt(e.point);
       if (park) selectPark(park);
       else if (state.marker) clearMarker();
-      if (hexAt(e.point)) return;   // inside the open neighborhood's hexes: keep it open (hexes overhang its edge)
+      // Inside the open neighborhood's hexes: keep it open (hexes overhang its edge) and show that spot's details,
+      // which is how a touch screen (no hover) reads a hex
+      if (hexAt(e.point)) { renderTooltip(hitsAt(e.point), e.point); return; }
+      $("tooltip").hidden = true;
       const f = map.getLayer("fill") && map.queryRenderedFeatures(e.point, { layers: ["fill"] })[0];
       if (f) select(f.id, false);
+      else if (state.selected) select(null);   // empty map (water, outside the city): close the area and its hexes
     });
     renderDestPins();
     renderAreaOnMap();
@@ -1210,7 +1389,8 @@
   function renderDestPins() {
     if (!map) return;
     destMarkers.forEach((mk) => mk.remove());
-    destMarkers = dests.map((d) => {
+    // Only the destination(s) you commute to get a pin; switch to another from the "Commute to" menu
+    destMarkers = dests.filter((d) => d.on).map((d) => {
       const el = document.createElement("div");
       el.className = "dest" + (d.on ? "" : " off");
       el.innerHTML = `<span class="dest-pin">${BRIEFCASE}</span><span class="dest-label">${esc(d.name)}</span><span class="dest-shadow"></span>`;
@@ -1238,7 +1418,7 @@
     $("destSummary").textContent = cur ? cur.name : "None";
     $("destSummary").classList.toggle("edited", !sameAsConfig());
     $("destMenu").innerHTML = `
-      <p class="dd-hint">Commute is scored to the one place you pick. Drag its pin to move it, or click a gray pin on the map to switch.</p>
+      <p class="dd-hint">Commute is scored to the one place you pick. Drag its pin on the map to move it.</p>
       <div role="radiogroup" aria-label="Commute to">${dests.map((d, i) => `<div class="dest-row">
         <input type="radio" name="destPick" data-on="${i}" ${d.on ? "checked" : ""} aria-label="Commute to ${esc(d.name)}">
         <input type="text" data-name="${i}" value="${esc(d.name)}" aria-label="Destination name" autocomplete="off" spellcheck="false">
@@ -1354,9 +1534,14 @@
       "line-width": ["case", ["boolean", ["feature-state", "sel"], false], 2.6,
         ["boolean", ["feature-state", "hover"], false], 1.6, 0],
     } });
-    // The clicked park: a green outline above the neighborhood lines, below the markers
-    if (map.getSource("parks")) map.addLayer({ id: "parks-sel", type: "line", source: "parks", filter: PARK_NONE,
-      layout: { "line-join": "round" }, paint: { "line-color": dark ? "#8fe0a8" : "#1f6b3a", "line-width": 3 } });
+    // The clicked park: a green outline above the neighborhood lines, below the markers; a thinner one on hover
+    if (map.getSource("parks")) {
+      map.addLayer({ id: "parks-hover", type: "line", source: "parks", layout: { "line-join": "round" },
+        paint: { "line-color": dark ? "#8fe0a8" : "#1f6b3a", "line-width": 1.6,
+          "line-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0] } });
+      map.addLayer({ id: "parks-sel", type: "line", source: "parks", filter: PARK_NONE,
+        layout: { "line-join": "round" }, paint: { "line-color": dark ? "#8fe0a8" : "#1f6b3a", "line-width": 3 } });
+    }
     addContextPoints(dark);
     styleReady = true;
     applyLayerVisibility();
@@ -1418,7 +1603,7 @@
     const pk = PARK[dark ? "dark" : "light"];
     if (L.parks?.features?.length) {
       L.parks.features.forEach((f, i) => { f.properties.pid = i; });   // what a park selection filters on
-      map.addSource("parks", { type: "geojson", data: L.parks });
+      map.addSource("parks", { type: "geojson", data: L.parks, promoteId: "pid" });
       map.addLayer({ id: "parks-fill", type: "fill", source: "parks", paint: { "fill-color": pk.fill, "fill-opacity": pk.op } }, beforeId);
       map.addLayer({ id: "parks-line", type: "line", source: "parks", minzoom: 12,
         paint: { "line-color": pk.line, "line-width": 0.7 } }, beforeId);
@@ -1451,7 +1636,8 @@
     if (L.subway?.lines?.features?.length) {
       map.addSource("subway-lines", { type: "geojson", data: L.subway.lines, promoteId: "route" });
       map.addLayer({ id: "subway-lines", type: "line", source: "subway-lines", layout: round,
-        paint: { "line-color": ["get", "color"], "line-opacity": 0.9,
+        // muted at city zoom so the lines read as structure, not as the subject; full color once you zoom in
+        paint: { "line-color": ["get", "color"], "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.35, 12.5, 0.55, 14, 0.9],
           "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.2, 13, 2.2, 16, 4] } }, beforeId);
       map.addLayer({ id: "subway-lines-hover", type: "line", source: "subway-lines", layout: round,
         paint: { "line-color": ["get", "color"], "line-opacity": hlOpacity,
@@ -1555,9 +1741,10 @@
       addHoverTwin(st);
     }
     const badges = [
-      ["grocery", L.grocery, "errands", "Full-size grocery store", 11],
-      ["gyms", L.gyms, "gym", "Full-size gym", 11],
-      ["places", L.places, "favorites", "On your list", 9],
+      // Points wait for street-level zooms: at city zoom the map's answer is the neighborhood colors
+      ["grocery", L.grocery, "errands", "Full-size grocery store", 13],
+      ["gyms", L.gyms, "gym", "Full-size gym", 13],
+      ["places", L.places, "favorites", "On your list", 12],
     ];
     for (const [id, rows, iconKey, kind, minzoom] of badges) {
       if (!rows?.length) continue;
@@ -1589,7 +1776,7 @@
         data: pointsFC(L.airports, (r) => ({ kind: "airport", name: r[2], key: r[3] })) });
       const ap = { id: "airports", type: "symbol", source: "airports",
         layout: { "icon-image": "badge-airports", "icon-allow-overlap": true, "icon-ignore-placement": true,
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 13, 1] } };
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.45, 12, 0.7, 14, 1] } };
       map.addLayer(ap);
       addHoverTwin(ap);
       map.addLayer({ id: "airport-codes", type: "symbol", source: "airports",
@@ -1613,18 +1800,65 @@
       map.addLayer({ id: "subway-stations-sel", type: "circle", source: "subway-stations", filter: SEL_NONE,
         paint: { "circle-color": surf, "circle-stroke-color": ink, "circle-stroke-width": 3,
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4, 13, 7, 16, 10] } });
-    pointHover = null; lineHoverKey = ""; lineHl = { "subway-lines": new Set(), "bus-lines": new Set() };   // new sources, no state
+    pointHovers = []; parkHover = null; hexHover = null; lineHoverKey = ""; lineHl = { "subway-lines": new Set(), "bus-lines": new Set() };   // new sources, no state
     applyMarkerSel();
   }
 
   // Hovered map point: feature-state makes its twin layer's enlarged copy opaque
-  let pointHover = null;
-  function setPointHover(f) {
-    const next = f && f.id != null ? { source: f.source, id: f.id } : null;
-    if (next?.source === pointHover?.source && next?.id === pointHover?.id) return;
-    if (pointHover && map.getSource(pointHover.source)) map.setFeatureState(pointHover, { hover: false });
-    pointHover = next;
-    if (next) map.setFeatureState(next, { hover: true });
+  let pointHovers = [];
+  function setPointHovers(feats) {
+    const next = feats.filter((f) => f.id != null).map((f) => ({ source: f.source, id: f.id }));
+    const key = (x) => x.source + "|" + x.id, nextKeys = new Set(next.map(key));
+    for (const h of pointHovers) if (!nextKeys.has(key(h)) && map.getSource(h.source)) map.setFeatureState(h, { hover: false });
+    const had = new Set(pointHovers.map(key));
+    for (const h of next) if (!had.has(key(h))) map.setFeatureState(h, { hover: true });
+    pointHovers = next;
+  }
+  const setPointHover = (f) => setPointHovers(f ? [f] : []);
+  let parkHover = null;
+  function setParkHover(pid) {
+    if (pid === parkHover || !map.getSource("parks")) return;
+    if (parkHover != null) map.setFeatureState({ source: "parks", id: parkHover }, { hover: false });
+    parkHover = pid;
+    if (pid != null) map.setFeatureState({ source: "parks", id: pid }, { hover: true });
+  }
+  const MAX_POINT_SECTIONS = 3;
+  const POINT_LABELS = ["subway-routes", "subway-names", "bus-routes"];
+  // Every hoverable thing under a screen point: points (topmost first, one per feature), the subway and bus lines
+  // within a few pixels, the park, the open neighborhood's hex, and the neighborhood.
+  function hitsAt(pt) {
+    const vis = (id) => map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none";
+    const seen = new Set();
+    // a station's route bullets and name, and a bus stop's route label, count as the station or stop itself
+    const points = map.queryRenderedFeatures(pt, { layers: [...POINT_LAYERS, ...POINT_LABELS].filter(vis) })
+      .filter((f) => { const k = f.source + "|" + (f.id ?? f.properties.name); return !seen.has(k) && seen.add(k); });
+    const lineLayers = ["subway-lines", "bus-lines"].filter(vis);
+    const lines = lineLayers.length ? map.queryRenderedFeatures([[pt.x - 4, pt.y - 4], [pt.x + 4, pt.y + 4]], { layers: lineLayers }) : [];
+    const uniq = (src) => [...new Map(lines.filter((f) => f.source === src).map((f) => [f.properties.route, f.properties])).values()];
+    const hex = hexAt(pt), park = parkAt(pt);
+    const hood = map.getLayer("fill") ? map.queryRenderedFeatures(pt, { layers: ["fill"] })[0] || null : null;
+    return { points, sub: uniq("subway-lines"), bus: uniq("bus-lines"), hex, park, hood };
+  }
+  // One card for everything under a point: hover and taps both draw it here
+  function renderTooltip(hits, pt) {
+    const sections = tooltipSections(hits), tip = $("tooltip");
+    if (!sections.length) { tip.hidden = true; return; }
+    tip.classList.toggle("wide", hits.points.some((f) => f.properties.kind === "airport"));
+    tip.innerHTML = sections.join('<div class="tsep" role="separator"></div>');
+    placeTooltip(pt);
+  }
+  function tooltipSections(h) {
+    const out = h.points.slice(0, MAX_POINT_SECTIONS).map(pointHtml);
+    if (h.points.length > MAX_POINT_SECTIONS) out.push(`<div class="ts">and ${h.points.length - MAX_POINT_SECTIONS} more here</div>`);
+    const served = (kind) => new Set(h.points.filter((f) => f.properties.kind === kind)
+      .flatMap((f) => String(f.properties.routes || "").split(/[\s,]+/)).flatMap((r) => [r, r + "X"]));
+    const sSub = served("station"), sBus = served("bus");
+    const sub = h.sub.filter((x) => !sSub.has(x.route)), bus = h.bus.filter((x) => !sBus.has(x.route));
+    if (sub.length || bus.length) out.push(linesHtml(sub, bus));
+    if (h.park) out.push(`<div class="tn">${esc(h.park.properties.name)}</div><div class="ts">${esc(parkText(h.park.properties, true))}</div>`);
+    if (h.hex) out.push(hexHtml(h.hex));
+    else if (h.hood) out.push(hoodHtml(h.hood.id));
+    return out.filter(Boolean);
   }
 
   function applyLayerVisibility() {
@@ -1633,14 +1867,12 @@
       if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", layerOn[c.id] ? "visible" : "none");
   }
   const POINT_LAYERS = ["airports", "places", "gyms", "grocery", "subway-stations", "bus-stops"];
-  function overlayTooltip(f, pt) {
-    const p = f.properties, tip = $("tooltip");
-    tip.classList.toggle("wide", p.kind === "airport");
-    if (p.kind === "airport") { tip.innerHTML = airportCardHtml(p.key.toLowerCase(), p.name); return placeTooltip(pt); }
+  function pointHtml(f) {
+    const p = f.properties;
+    if (p.kind === "airport") return airportCardHtml(p.key.toLowerCase(), p.name);
     const sub = p.kind === "station" ? "Subway station" : p.kind === "bus" ? `Bus stop${p.routes ? " · " + p.routes : ""}`
-      : p.kind === "airport" ? `Airport (${p.key}) · counted in the Airports score` : p.kind;
-    tip.innerHTML = `<div class="tn">${esc(p.name)}</div><div class="ts">${esc(sub)}</div>${p.kind === "station" ? bullets(p.routes) : ""}`;
-    placeTooltip(pt);
+      : p.kind;
+    return `<div class="tn">${esc(p.name)}</div><div class="ts">${esc(sub)}</div>${p.kind === "station" ? bullets(p.routes) : ""}`;
   }
   // Highlight whole routes: the lines under the pointer, or every line serving the hovered stop/station
   // Only the routes whose state changed are touched (feature-state is main-thread only, no re-tiling).
@@ -1749,11 +1981,10 @@
   }
   const hexAt = (point) => (map.getLayer("hex-fill") && map.getLayoutProperty("hex-fill", "visibility") !== "none"
     ? map.queryRenderedFeatures(point, { layers: ["hex-fill"] })[0] || null : null);
-  function hexTooltip(f, pt, park) {
+  function hexHtml(f) {
     const r = byId.get(hexShown), row = r && HX.by_nta[r.id]?.[f.properties.i];
-    if (!row) return;
-    const h = evalHex(row, r), tip = $("tooltip");
-    tip.classList.remove("wide");
+    if (!row) return "";
+    const h = evalHex(row, r);
     const label = state.colorBy === "total" ? "match here" : META.factors[state.colorBy].label;
     const v = state.colorBy === "total" ? h.total : h.s[state.colorBy];
     const nv = state.colorBy === "total" ? r.total : r.s[state.colorBy];
@@ -1763,13 +1994,11 @@
       .sort((a, b) => Math.abs(b.d) * (state.weights[b.k] || 0) - Math.abs(a.d) * (state.weights[a.k] || 0)).slice(0, 4);
     const rows = diffs.map((x) => `<div class="hx-row"><span>${esc(META.factors[x.k].label)}</span><b>${Math.round(h.s[x.k])}</b>
       <span class="hx-d ${x.d > 0 ? "up" : "down"}">${x.d > 0 ? "+" : "−"}${Math.round(Math.abs(x.d))}</span></div>`).join("");
-    tip.innerHTML = `<div class="tn">${esc(r.f.properties.name)} · this spot</div>
+    return `<div class="tn">${esc(r.f.properties.name)} · this spot</div>
       <div><span class="tv">${v == null ? "—" : Math.round(v)}</span> <span class="ts">${esc(label)}${nv != null ? ` · area ${Math.round(nv)}` : ""}</span></div>
       ${h.mins != null ? `<div class="tr">${liveEstimated ? "~" : ""}${Math.round(h.mins)} min commute</div>` : ""}
       ${rows ? `<div class="hx-rows"><div class="ts">vs the area as a whole</div>${rows}</div>` : ""}
-      ${h.few ? `<div class="ts">Few residents here (park, industry or rail)</div>` : ""}
-      ${park ? `<div class="tpark">${esc(parkText(park))}</div>` : ""}`;
-    placeTooltip(pt);
+      ${h.few ? `<div class="ts">Few residents here (park, industry or rail)</div>` : ""}`;
   }
 
   // ---------- marker selection: click a marker to light up every marker of the same kind ----------
@@ -1793,9 +2022,10 @@
     if (!map || !map.getLayer("parks-fill") || map.getLayoutProperty("parks-fill", "visibility") === "none") return null;
     return map.queryRenderedFeatures(point, { layers: ["parks-fill"] })[0] || null;
   }
-  function parkText(p) {
+  function parkText(p, noName) {
     const acres = p.acres >= 10 ? Math.round(p.acres) : p.acres;
-    return [p.name, `${acres} acre${acres === 1 ? "" : "s"}`, p.run5k ? `5K ${p.run5k}` : null].filter(Boolean).join(" · ");
+    return [noName ? "Park" : p.name, `${acres} acre${acres === 1 ? "" : "s"}`, p.run5k ? `5K ${p.run5k}` : null]
+      .filter(Boolean).join(" · ");
   }
   function selectPark(f) {
     const p = f.properties;
@@ -1821,21 +2051,42 @@
     $("clearSel").onclick = clearMarker;
   }
 
-  function lineTooltip(sub, bus, pt) {
-    const tip = $("tooltip");
+  function linesHtml(sub, bus) {
     const busRows = bus.slice(0, 4).map((b) => `<div class="tr"><b>${esc(b.route)}</b>${b.kind === "sbs" ? " · Select Bus" : b.kind === "express" ? " · Express" : ""}
-      <div class="ts">${esc([b.name, b.via].filter(Boolean).join(" · "))}</div></div>`).join("");
-    tip.innerHTML = (sub.length ? `<div class="tn">Subway</div>${bullets(sub.map((x) => x.route).join(" "))}` : "") +
+      <div class="ts">${esc(b.name || "")}</div></div>`).join("");
+    return (sub.length ? `<div class="tn">Subway</div>${bullets(sub.map((x) => x.route).join(" "))}` : "") +
       (bus.length ? `<div class="tn"${sub.length ? ' style="margin-top:6px"' : ""}>Bus route${bus.length > 1 ? "s" : ""}</div>${busRows}` +
         (bus.length > 4 ? `<div class="ts">and ${bus.length - 4} more</div>` : "") : "");
-    placeTooltip(pt);
   }
+  // Floating UI keeps the card inside the map: it sits right of and below the pointer, flips to the other side
+  // near an edge, slides along it, and caps its height so a tall stack never spills off the map.
+  let tipSeq = 0;
   function placeTooltip(pt) {
-    const tip = $("tooltip");
+    const tip = $("tooltip"), wrap = $("mapwrap");
     tip.hidden = false;
-    const W = $("mapwrap").clientWidth, H = $("mapwrap").clientHeight;
-    const x = Math.min(pt.x + 14, W - tip.offsetWidth - 8), y = Math.min(pt.y + 14, H - tip.offsetHeight - 8);
-    tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+    const FUI = window.FloatingUIDOM;
+    if (!FUI) {   // no library (offline): clamp by hand
+      const W = wrap.clientWidth, H = wrap.clientHeight;
+      const x = Math.min(pt.x + 14, W - tip.offsetWidth - 8), y = Math.min(pt.y + 14, H - tip.offsetHeight - 8);
+      tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+      return;
+    }
+    const box = wrap.getBoundingClientRect(), x = box.left + pt.x, y = box.top + pt.y;
+    const pointer = { getBoundingClientRect: () => ({ x, y, left: x, top: y, right: x, bottom: y, width: 0, height: 0 }) };
+    // the visible map: stop at the floating detail panel when it's open beside the map (not the mobile bottom sheet)
+    const panel = $("detail"), pr = !panel.hidden && !MOBILE() ? panel.getBoundingClientRect() : null;
+    const right = pr && pr.left > box.left ? Math.min(box.right, pr.left) : box.right;
+    const edge = { boundary: { x: box.left, y: box.top, width: right - box.left, height: box.height }, padding: 8 };
+    const seq = ++tipSeq;   // pointer moves faster than positions resolve: only the latest one applies
+    FUI.computePosition(pointer, tip, {
+      strategy: "absolute", placement: "right-start",
+      middleware: [FUI.offset({ mainAxis: 14, crossAxis: 14 }), FUI.flip({ ...edge, fallbackPlacements: ["left-start", "right-end", "left-end"] }),
+        FUI.shift({ ...edge, crossAxis: true }),
+        FUI.size({ ...edge, apply: ({ availableHeight }) => { tip.style.maxHeight = Math.max(120, availableHeight) + "px"; } })],
+    }).then(({ x: left, y: top }) => {
+      if (seq !== tipSeq) return;
+      tip.style.left = left + "px"; tip.style.top = top + "px";
+    });
   }
 
   function fillExpression() {
@@ -1906,29 +2157,28 @@
     if (fromMap) document.querySelectorAll(`.ranking li[data-id="${CSS.escape(id)}"]`).forEach((li) => li.classList.add("hl"));
   }
 
-  function showTooltip(id, pt, park) {
-    const r = byId.get(id), tip = $("tooltip");
-    tip.classList.remove("wide");
-    if (!r) return;
-    const parkLine = park ? `<div class="tpark">${esc(parkText(park))}</div>` : "";
+  function hoodHtml(id) {
+    const r = byId.get(id);
+    if (!r) return "";
     const p = r.f.properties, rent = rentOf(p), mins = commuteOf(p);
     const v = colorValue(r);
     const label = state.colorBy === "total" ? "match" : META.factors[state.colorBy].label;
-    tip.innerHTML = `<div class="tn">${esc(p.name)}</div>
+    return `<div class="tn">${esc(p.name)}</div>
       ${p.residential ? `<div><span class="tv">${v == null ? "—" : Math.round(v)}</span> <span class="ts">${esc(label)}${r.rank ? ` · #${r.rank}` : ""}</span></div>
       <div class="tr">${[rent != null ? fmtRent(rent) + (rentIsEstimate(p) ? " est." : "") : null, mins != null ? `${commuteIsEstimate(p) ? "~" : ""}${Math.round(mins)} min` : null].filter(Boolean).join(" · ")}</div>` : ""}
-      ${r.reason ? `<div class="ts">${esc(r.reason)}</div>` : ""}${parkLine}`;
-    placeTooltip(pt);
+      ${r.reason ? `<div class="ts">${esc(r.reason)}</div>` : ""}`;
   }
 
   function select(id, fly) {
     const prev = state.selected;
     state.selected = id;
+    if (id !== prev) $("detail").classList.remove("full");   // a new area opens the phone sheet at its short height
     renderDetail();   // the docked panel changes the map's width; the ResizeObserver on #mapwrap resizes the map
     if (id && fly && map) {
       const f = BY_ID.get(id);
-      const floating = !MOBILE() && matchMedia("(max-width: 1180px)").matches;
-      const pad = MOBILE() ? { top: 40, bottom: 40, left: 40, right: 40 } : { top: 80, bottom: 80, left: 80, right: floating ? 400 : 80 };
+      // wide screens: the panel floats over the map's right edge, so keep the area clear of it
+      const pad = MOBILE() ? { top: 40, bottom: 40, left: 40, right: 40 }
+        : { top: 80, bottom: 80, left: 80, right: DOCKED() ? 80 : 420 };
       map.fitBounds(bbox([f]), { padding: pad, maxZoom: 14, duration: motionMs(600) });
     }
     if (id && !fly && state.tab === "matches") {
