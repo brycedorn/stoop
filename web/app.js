@@ -1946,9 +1946,14 @@
     const r = state.selected && byId.get(state.selected);
     const rows = r && HX ? HX.by_nta[r.id] || [] : [];
     const clip = (r && HX.clip?.[r.id]) || {};   // edge hexes come cut to the neighborhood outline (no hexes over water)
+    const decodeRing = (flat) => {   // [lon0, lat0, dlon1, dlat1, ...] in 1e-5 degrees (hexes.encode_ring)
+      const ring = [];
+      for (let i = 0, x = 0, y = 0; i < flat.length; i += 2) { x += flat[i]; y += flat[i + 1]; ring.push([x / 1e5, y / 1e5]); }
+      return ring;
+    };
     return { type: "FeatureCollection", features: rows.map((row, i) => {
       const h = evalHex(row, r), v = state.colorBy === "total" ? h.total : h.s[state.colorBy];
-      const geometry = clip[i] ? { type: "MultiPolygon", coordinates: clip[i] } : { type: "Polygon", coordinates: [hexRing(row[0], row[1])] };
+      const geometry = clip[i] ? { type: "MultiPolygon", coordinates: clip[i].map((poly) => poly.map(decodeRing)) } : { type: "Polygon", coordinates: [hexRing(row[0], row[1])] };
       return { type: "Feature", id: i, geometry,
         properties: { i, v: v == null ? -1 : v, few: h.few } };
     }) };

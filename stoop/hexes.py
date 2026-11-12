@@ -9,8 +9,8 @@ see geo.collect_cells). Here they're scored on the neighborhood scale (scoring.s
       "inherited": [...],                          # factors that are neighborhood-wide (the hex shows its NTA's)
       "dests": [...],                              # configured commute destinations, in order
       "by_nta": {"BK0101": [[q, r, pop, f1..fn, commute_min, d1..dk, station_pct], ...]},
-      "clip": {"BK0101": {"3": [[[lon, lat], ...]], ...}}   # edge hexes cut to the neighborhood outline
-    }                                                # (MultiPolygon coordinates, keyed by row index)
+      "clip": {"BK0101": {"3": [[ring, ...], ...]}}  # edge hexes cut to the neighborhood outline, keyed by row
+    }                                              # index: polygons of rings, each ring delta-encoded (encode_ring)
 Scores and minutes are whole numbers; null = no data.
 """
 from __future__ import annotations
@@ -75,8 +75,29 @@ def clip_shapes(ctx, grid) -> dict[int, list]:
         parts = shapely.get_parts(shapely.get_parts(g))   # collections and multipolygons -> single parts
         polys = [p for p in parts if p.geom_type == "Polygon" and not p.is_empty]
         if polys:
-            out[int(grid.index[i])] = [mapping(p)["coordinates"] for p in polys]
+            out[int(grid.index[i])] = [[encode_ring(ring) for ring in mapping(p)["coordinates"]] for p in polys]
     log.info("hexes: %d of %d cut to the neighborhood outline", len(out), len(grid))
+    return out
+
+
+def encode_ring(coords) -> list[int]:
+    """[(lon, lat), ...] -> [lon0, lat0, dlon1, dlat1, ...] in 1e-5 degree steps (~1 m): the first point whole, then
+    the step from the previous point. About a third the size of plain coordinates. Decoded by decodeRing in app.js."""
+    out, px, py = [], 0, 0
+    for lon, lat in coords:
+        x, y = round(lon * 1e5), round(lat * 1e5)
+        out += [x - px, y - py]
+        px, py = x, y
+    return out
+
+
+def decode_ring(flat) -> list[tuple[float, float]]:
+    x = y = 0
+    out = []
+    for i in range(0, len(flat), 2):
+        x += flat[i]
+        y += flat[i + 1]
+        out.append((x / 1e5, y / 1e5))
     return out
 
 
