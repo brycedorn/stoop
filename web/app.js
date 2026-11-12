@@ -1944,9 +1944,11 @@
   function hexData() {
     const r = state.selected && byId.get(state.selected);
     const rows = r && HX ? HX.by_nta[r.id] || [] : [];
+    const clip = (r && HX.clip?.[r.id]) || {};   // edge hexes come cut to the neighborhood outline (no hexes over water)
     return { type: "FeatureCollection", features: rows.map((row, i) => {
       const h = evalHex(row, r), v = state.colorBy === "total" ? h.total : h.s[state.colorBy];
-      return { type: "Feature", id: i, geometry: { type: "Polygon", coordinates: [hexRing(row[0], row[1])] },
+      const geometry = clip[i] ? { type: "MultiPolygon", coordinates: clip[i] } : { type: "Polygon", coordinates: [hexRing(row[0], row[1])] };
+      return { type: "Feature", id: i, geometry,
         properties: { i, v: v == null ? -1 : v, few: h.few } };
     }) };
   }
