@@ -6,11 +6,12 @@
   <title>stoop · NYC neighborhood finder</title>
   <meta name="description" content="Rank NYC neighborhoods by what matters to you: rent, commute, running, your favorite places, safety and more.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fbf9f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1b1a17" media="(prefers-color-scheme: dark)">
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="preload" href="fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script>/* apply a saved Light/Dark choice before the first paint (no flash) */
     try { var t = localStorage.getItem("stoop.theme.v1"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
@@ -82,6 +83,7 @@
         <input id="showOver" type="checkbox" aria-label="Include over-budget areas">
         <span class="t-long">Include over-budget areas</span><span class="t-short" aria-hidden="true">Over budget too</span>
       </label>
+      <button class="btn ghost sm" id="resetFilters" type="button" hidden>Reset</button>
     </div>
 
     <p class="count" id="count" aria-live="polite"></p>
@@ -117,18 +119,25 @@
     </section>
 
     <section class="pane" id="pane-priorities" role="tabpanel" aria-labelledby="tab-priorities" hidden>
-      <p class="hint">How much each thing counts toward the match score. Shares add up to 100%.</p>
+      <p class="hint">Drag what matters most to the top. Higher counts more; anything below the line doesn't count.</p>
       <details class="more how">
         <summary>How the match score works</summary>
         <ul>
           <li>Each factor scores a neighborhood from 0 to 100. Most are percentiles among NYC's residential areas (100 = best in the city).</li>
-          <li>Rent, commute and flood use fixed curves instead: rent against your budget, minutes of commute, the share of land that floods.</li>
+          <li>Rent and commute use fixed curves instead: rent against your budget, minutes of commute.</li>
           <li>The match is the average of the factors you turn on, weighted by these shares. Must-haves (bedrooms, budget, commute, boroughs) decide what's listed, not the score.</li>
         </ul>
       </details>
       <p class="warn-line" id="weightsMsg" role="status" hidden>Every priority is off, so no neighborhood gets a score. Turn at least one up.</p>
       <div class="presets" id="presets" role="group" aria-label="Presets"></div>
-      <div id="weights"></div>
+      <div class="link-row"><button class="btn ghost sm" id="copyLink" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Copy link to this ranking</button>
+        <p class="ts" id="copyMsg" role="status" hidden></p></div>
+      <ol class="rank" id="rank" aria-label="Your priorities, most important first"></ol>
+      <p class="sr-only" id="rankLive" role="status" aria-live="polite"></p>
+      <details class="more finetune">
+        <summary>Fine-tune with sliders</summary>
+        <div id="weights"></div>
+      </details>
       <button class="btn ghost" id="reset" type="button">Reset to my defaults</button>
     </section>
 
@@ -155,7 +164,7 @@
       <div class="sel-chip" id="selChip" role="status" hidden></div>
     </div>
     <div class="map-card legend-card">
-      <label class="colorby">Color by <select id="colorBy"></select></label>
+      <label class="colorby"><span>Color by</span> <select id="colorBy" aria-label="Color the map by"></select></label>
       <div class="legend" id="legend"></div>
     </div>
     <div class="map-hint" id="mapHint" role="status" hidden>Click the map to drop a destination · Esc to cancel</div>
@@ -177,6 +186,9 @@
   <script src="data/airports.js" onerror="window.STOOP_AIRPORTS = {}"></script>
   <script src="data/hexes.js" onerror="window.STOOP_HEXES = null"></script>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <!-- tooltip positioning: flips and shifts to stay inside the map (optional; app.js falls back without it) -->
+  <script src="https://cdn.jsdelivr.net/npm/@floating-ui/core@1.6.8/dist/floating-ui.core.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.6.12/dist/floating-ui.dom.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
