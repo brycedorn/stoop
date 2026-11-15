@@ -64,12 +64,13 @@
   };
   const short = (k) => SHORT[k] || META.factors[k].label;
 
-  // Sequential ramp, 5 classes (dataviz reference blue). Light: light->dark = low->high.
-  // Dark mode flips the anchor: classes get lighter as the match improves.
+  // Sequential ramp, 5 classes, orange (weak match) through gold to green (strong match): the hue says which end
+  // is good at a glance. Lightness still runs in one direction (light->dark on the light map, dark->light on the
+  // dark one), so the order holds for color-blind readers who can't separate orange from green.
+  // Steps are evenly spaced in OKLab lightness; the light end clears the basemap land (#f2f2f0 / #1a1a19) at 2:1.
   const RAMP = {
-    // validated with dataviz validate_palette.js --ordinal against the basemap land (#f2f2f0 / #1a1a19)
-    light: ["#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"],
-    dark: ["#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4"],
+    light: ["#f19560", "#be9223", "#6a9228", "#257c3a", "#045d35"],
+    dark: ["#853e19", "#996b00", "#7fa034", "#6dc97d", "#93e7b3"],
   };
   const BASEMAP = {
     light: "https://tiles.openfreemap.org/styles/positron",
@@ -1429,7 +1430,7 @@
     // The grid can settle after the map is created (fonts, mobile toolbar): keep the canvas in sync.
     new ResizeObserver(() => map.resize()).observe($("mapwrap"));
     map.on("style.load", addLayers);
-    map.on("zoom", syncBusStops);
+    map.on("zoom", syncGroups);
     map.on("styleimagemissing", (e) => {
       if (e.id.startsWith("rbs:") && !map.hasImage(e.id)) map.addImage(e.id, bulletsImage(e.id.slice(4)));
     });
@@ -1669,9 +1670,9 @@
     { id: "busroutes", label: "Bus routes", note: "zoom in", has: () => L.bus_routes?.features?.length,
       layers: ["bus-lines-casing", "bus-lines", "bus-lines-hover", "bus-line-labels"] },
     { id: "bus", label: "Bus stops", note: "zoom in", has: () => L.bus?.length, layers: ["bus-stops", "bus-stops-hover", "bus-routes", "bus-stops-sel"] },
-    { id: "grocery", label: "Full-size grocery", has: () => L.grocery?.length, layers: ["grocery", "grocery-hover", "grocery-sel", "grocery-sel-ring"] },
-    { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-sel", "gyms-sel-ring"] },
-    { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-sel", "places-sel-ring"] },
+    { id: "grocery", label: "Full-size grocery", has: () => L.grocery?.length, layers: ["grocery", "grocery-hover", "grocery-count", "grocery-sel", "grocery-sel-ring"] },
+    { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-count", "gyms-sel", "gyms-sel-ring"] },
+    { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
     { id: "airports", label: "Airports", has: () => L.airports?.length, layers: ["airports", "airports-hover", "airport-codes"] },
     { id: "runhex", label: "Runner hexes", has: () => L.runhex?.features?.length, layers: ["runhex-fill", "runhex-line"] },
     { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-line"] },
@@ -1689,14 +1690,17 @@
   const inBoros = (r) => !r[4] || state.boroughs.has(r[4]);
   const BORO_LAYERS = ["parks-fill", "parks-line", "subway-lines", "subway-lines-hover", "bus-lines-casing", "bus-lines",
     "bus-lines-hover", "bus-line-labels",
-    "subway-stations", "subway-routes", "subway-names", "bus-stops", "bus-routes", "grocery", "gyms", "places"];
+    "subway-stations", "subway-routes", "subway-names", "bus-stops", "bus-routes", "grocery", "gyms", "places", "grocery-count", "gyms-count", "places-count"];
+  // layers that have a filter of their own, kept under the borough filter
+  const MERGED = [">", ["get", "n"], 1];
+  const BASE_FILTER = { "grocery-count": MERGED, "gyms-count": MERGED, "places-count": MERGED };
   let boroKey = "";
   function applyBoroughFilter(force) {
     if (!map || !styleReady) return;
     const k = [...state.boroughs].sort().join("|");
     if (!force && k === boroKey) return;
     boroKey = k;
-    for (const id of BORO_LAYERS) if (map.getLayer(id)) map.setFilter(id, withBoro(null));
+    for (const id of BORO_LAYERS) if (map.getLayer(id)) map.setFilter(id, withBoro(BASE_FILTER[id] || null));
     applyMarkerSel();   // re-filters the selection twins and route highlights
   }
   const MARKER = {
@@ -1815,42 +1819,88 @@
   }
   const TEXT_FONT = ["Noto Sans Regular"];   // a font stack OpenFreeMap serves for both basemaps
 
-  // Bus stops: at a corner the stops for each direction sit a few meters apart and stack into one blob. Until you
-  // zoom in close (BUS_SPLIT_Z) stops within BUS_GROUP_M of each other show as one marker carrying all their
-  // routes; from there in, each stop shows on its own.
-  const BUS_SPLIT_Z = 17, BUS_GROUP_M = 60;
-  let busSplit = null, busGroups = null;
+  // Markers that would sit on top of each other merge into one, until you zoom in close (GROUP_SPLIT_Z).
+  // Bus stops and subway stations group by distance on the ground: a corner's stops for each direction, a
+  // station's separate platforms. Groceries, gyms and your places group by distance on screen, so their badges
+  // don't stack at any zoom; the merged badge shows how many it holds and a click zooms in to split it.
+  // A merged marker carries every member's key (so "light up all of this kind" still finds it) and, for transit,
+  // all of their routes.
+  const GROUP_SPLIT_Z = 17, STOP_GROUP_M = 60, BADGE_GROUP_PX = 26;
   const routeSort = (a, b) => a.localeCompare(b, "en", { numeric: true });
-  function busGrouped() {
-    if (busGroups) return busGroups;
-    const kx = 111320 * Math.cos((40.7 * Math.PI) / 180), ky = 110540, cell = BUS_GROUP_M;
-    const rows = L.bus, xy = rows.map((r) => [r[0] * kx, r[1] * ky]), grid = new Map();
-    const at = (gx, gy) => grid.get(gx + "," + gy) || [];
-    xy.forEach(([x, y], i) => { const k = Math.floor(x / cell) + "," + Math.floor(y / cell); grid.has(k) ? grid.get(k).push(i) : grid.set(k, [i]); });
-    const used = new Uint8Array(rows.length);
-    busGroups = [];
-    for (let i = 0; i < rows.length; i++) {
-      if (used[i]) continue;
-      used[i] = 1;
-      const [x, y] = xy[i], gx = Math.floor(x / cell), gy = Math.floor(y / cell), members = [i];
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++)
-        for (const j of at(gx + dx, gy + dy)) if (!used[j] && Math.hypot(xy[j][0] - x, xy[j][1] - y) <= cell) { used[j] = 1; members.push(j); }
-      const routes = [...new Set(members.flatMap((j) => String(rows[j][3] || "").split(/\s+/).filter(Boolean)))].sort(routeSort);
-      const lon = members.reduce((a, j) => a + rows[j][0], 0) / members.length, lat = members.reduce((a, j) => a + rows[j][1], 0) / members.length;
-      busGroups.push([lon, lat, rows[i][2], routes.join(" "), rows[i][4] || "", members.length]);
-    }
-    return busGroups;
+  const KEY_SEP = "\n";
+  const GROUPED = {
+    "bus-stops": { rows: () => L.bus, ground: true, props: (r) => ({ kind: "bus", name: r[2], routes: r[3] || "", key: r[2] }) },
+    "subway-stations": { rows: () => L.subway?.stations, ground: true, joinNames: true,
+      props: (r) => ({ kind: "station", name: r[2], routes: r[3] || "", key: r[2] + "|" + r[3] }) },
+    // key: the brand for chains (every Whole Foods, every Equinox), otherwise the name (all branches of a place)
+    grocery: { rows: () => L.grocery, many: "grocery stores", props: (r) => ({ kind: "Full-size grocery store", name: r[2], key: r[3] || r[2] }) },
+    gyms: { rows: () => L.gyms, many: "gyms", props: (r) => ({ kind: "Full-size gym", name: r[2], key: r[3] || r[2] }) },
+    places: { rows: () => L.places, many: "of your places", props: (r) => ({ kind: "On your list", name: r[2], key: r[3] || r[2] }) },
+  };
+  const uniq = (a) => [...new Set(a)];
+  function groupLevel(id, z) {
+    if (z >= GROUP_SPLIT_Z) return "all";
+    return GROUPED[id].ground ? "near" : String(Math.max(10, Math.floor(z)));
   }
-  const busFC = (split) => pointsFC(split ? L.bus : busGrouped(), (r) => ({ kind: "bus", name: r[2], routes: r[3], key: r[2], stops: r[5] || 1 }));
-  function syncBusStops() {
-    const src = map?.getSource("bus-stops");
-    if (!src) return;
-    const split = map.getZoom() >= BUS_SPLIT_Z;
-    if (split === busSplit) return;
-    busSplit = split;
-    map.removeFeatureState({ source: "bus-stops" });   // ids are regenerated with the new data
-    pointHovers = pointHovers.filter((h) => h.source !== "bus-stops");
-    src.setData(busFC(split));
+  // meters a marker group spans at this level: fixed for stops, BADGE_GROUP_PX of screen at that zoom for badges
+  // (MapLibre zoom counts 512-px tiles)
+  const groupMeters = (id, level) => GROUPED[id].ground ? STOP_GROUP_M
+    : BADGE_GROUP_PX * 78271.52 * Math.cos((40.7 * Math.PI) / 180) / 2 ** Number(level);
+  function mergeProps(spec, ps) {
+    const p = { ...ps[0], n: ps.length, keys: KEY_SEP + uniq(ps.map((x) => x.key)).join(KEY_SEP) + KEY_SEP };
+    if (ps.length === 1) return p;
+    const names = uniq(ps.map((x) => x.name));
+    p.names = names.join(KEY_SEP);
+    if (spec.joinNames) p.name = names.join(" / ");
+    if ("routes" in p) p.routes = uniq(ps.flatMap((x) => x.routes.split(/\s+/)).filter(Boolean)).sort(routeSort).join(" ");
+    return p;
+  }
+  // Greedy: each marker not yet taken takes every untaken marker within reach (same borough only, so the
+  // borough filter still works), placed at their mean.
+  function groupFC(id, level) {
+    const spec = GROUPED[id];
+    spec.cache ||= {};
+    if (spec.cache[level]) return spec.cache[level];
+    const rows = spec.rows() || [], ps = rows.map((r) => ({ ...spec.props(r), boro: r[4] || "" }));
+    const feat = (lon, lat, props) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: props });
+    let features;
+    if (level === "all") features = rows.map((r, i) => feat(r[0], r[1], mergeProps(spec, [ps[i]])));
+    else {
+      const kx = 111320 * Math.cos((40.7 * Math.PI) / 180), ky = 110540, cell = groupMeters(id, level);
+      const xy = rows.map((r) => [r[0] * kx, r[1] * ky]), grid = new Map(), used = new Uint8Array(rows.length);
+      xy.forEach(([x, y], i) => { const k = Math.floor(x / cell) + "," + Math.floor(y / cell); grid.has(k) ? grid.get(k).push(i) : grid.set(k, [i]); });
+      features = [];
+      for (let i = 0; i < rows.length; i++) {
+        if (used[i]) continue;
+        used[i] = 1;
+        const [x, y] = xy[i], gx = Math.floor(x / cell), gy = Math.floor(y / cell), members = [i];
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++)
+          for (const j of grid.get(gx + dx + "," + (gy + dy)) || [])
+            if (!used[j] && ps[j].boro === ps[i].boro && Math.hypot(xy[j][0] - x, xy[j][1] - y) <= cell) { used[j] = 1; members.push(j); }
+        const mean = (k) => members.reduce((a, j) => a + rows[j][k], 0) / members.length;
+        features.push(feat(mean(0), mean(1), mergeProps(spec, members.map((j) => ps[j]))));
+      }
+    }
+    return (spec.cache[level] = { type: "FeatureCollection", features });
+  }
+  // A merged badge of different places: clicking it zooms in rather than picking one of them
+  const isCluster = (layer, p) => GROUPED[layer] && !GROUPED[layer].ground && p.n > 1 && String(p.keys).split(KEY_SEP).filter(Boolean).length > 1;
+  function syncGroups() {
+    const z = map.getZoom();
+    for (const id in GROUPED) {
+      const src = map.getSource(id), spec = GROUPED[id];
+      if (!src) continue;
+      const level = groupLevel(id, z);
+      if (level === spec.level) continue;
+      spec.level = level;
+      map.removeFeatureState({ source: id });   // ids are regenerated with the new data
+      pointHovers = pointHovers.filter((h) => h.source !== id);
+      src.setData(groupFC(id, level));
+    }
+  }
+  function addGroupedSource(id) {
+    GROUPED[id].level = groupLevel(id, map.getZoom());
+    map.addSource(id, { type: "geojson", generateId: true, data: groupFC(id, GROUPED[id].level) });
   }
 
   function addContextPoints(dark) {
@@ -1862,8 +1912,7 @@
           "text-size": 11, "text-keep-upright": true, "text-optional": true },
         paint: { "text-color": ink2, "text-halo-color": halo, "text-halo-width": 1.6 } });
     if (L.bus?.length) {
-      busSplit = map.getZoom() >= BUS_SPLIT_Z;
-      map.addSource("bus-stops", { type: "geojson", generateId: true, data: busFC(busSplit) });
+      addGroupedSource("bus-stops");
       if (!map.hasImage("badge-bus")) map.addImage("badge-bus", badgeImage("bus", dark ? "#6f6d68" : "#52514e"));
       const bus = { id: "bus-stops", type: "symbol", source: "bus-stops", minzoom: 14,
         layout: { "icon-image": "badge-bus", "icon-allow-overlap": true, "icon-ignore-placement": true,
@@ -1877,8 +1926,7 @@
         paint: { "text-color": ink2, "text-halo-color": halo, "text-halo-width": 1.4 } });
     }
     if (L.subway?.stations?.length) {
-      map.addSource("subway-stations", { type: "geojson", generateId: true,
-        data: pointsFC(L.subway.stations, (r) => ({ kind: "station", name: r[2], routes: r[3], key: r[2] + "|" + r[3] })) });
+      addGroupedSource("subway-stations");
       const st = { id: "subway-stations", type: "circle", source: "subway-stations", minzoom: 11,
         paint: { "circle-color": surf, "circle-stroke-color": ink, "circle-stroke-width": 1.4,
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2.2, 14, 4.5, 16, 6] } };
@@ -1896,20 +1944,24 @@
     }
     const badges = [
       // Points wait for street-level zooms: at city zoom the map's answer is the neighborhood colors
-      ["grocery", L.grocery, "errands", "Full-size grocery store", 13],
-      ["gyms", L.gyms, "gym", "Full-size gym", 13],
-      ["places", L.places, "favorites", "On your list", 12],
+      ["grocery", "errands", 13],
+      ["gyms", "gym", 13],
+      ["places", "favorites", 12],
     ];
-    for (const [id, rows, iconKey, kind, minzoom] of badges) {
-      if (!rows?.length) continue;
+    for (const [id, iconKey, minzoom] of badges) {
+      if (!GROUPED[id].rows()?.length) continue;
       if (!map.hasImage("badge-" + id)) map.addImage("badge-" + id, badgeImage(iconKey, markerColor(id)));
-      // key: the brand for chains (every Whole Foods, every Equinox), otherwise the name (all branches of a place)
-      map.addSource(id, { type: "geojson", generateId: true, data: pointsFC(rows, (r) => ({ kind, name: r[2], key: r[3] || r[2] })) });
+      addGroupedSource(id);
       const lyr = { id, type: "symbol", source: id, minzoom,
         layout: { "icon-image": "badge-" + id, "icon-allow-overlap": true, "icon-ignore-placement": true,
           "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.55, 13, 0.8, 16, 1] } };
       map.addLayer(lyr);
       addHoverTwin(lyr);
+      // how many a merged badge holds, on its shoulder
+      map.addLayer({ id: id + "-count", type: "symbol", source: id, minzoom, filter: MERGED,
+        layout: { "text-field": ["to-string", ["get", "n"]], "text-font": ["Noto Sans Bold"], "text-size": 11,
+          "text-offset": [0.95, -0.95], "text-allow-overlap": true, "text-ignore-placement": true },
+        paint: { "text-color": ink, "text-halo-color": surf, "text-halo-width": 2 } });
     }
     // Route from the selected neighborhood to an airport: casing, transit legs in their line color,
     // walking dotted, the fixed AirTrain / NJ Transit leg dashed
@@ -2024,8 +2076,15 @@
   function pointHtml(f) {
     const p = f.properties;
     if (p.kind === "airport") return airportCardHtml(p.key.toLowerCase(), p.name);
-    const sub = p.kind === "station" ? "Subway station" : p.kind === "bus" ? `${p.stops > 1 ? `${p.stops} bus stops` : "Bus stop"}${p.routes ? " · " + p.routes : ""}`
-      : p.kind;
+    const layer = f.layer.id.replace(/-(hover|sel|sel-ring|count)$/, "");
+    if (isCluster(layer, p)) {
+      const names = String(p.names || "").split(KEY_SEP).filter(Boolean), shown = names.slice(0, 4);
+      return `<div class="tn">${p.n} ${esc(GROUPED[layer].many)}</div>`
+        + shown.map((n) => `<div class="tr">${esc(n)}</div>`).join("")
+        + (names.length > shown.length ? `<div class="ts">and ${names.length - shown.length} more · click to zoom in</div>` : `<div class="ts">Click to zoom in</div>`);
+    }
+    const sub = p.kind === "station" ? "Subway station" : p.kind === "bus" ? `${p.n > 1 ? `${p.n} bus stops` : "Bus stop"}${p.routes ? " · " + p.routes : ""}`
+      : p.n > 1 ? `${p.kind} · ${p.n} here` : p.kind;
     return `<div class="tn">${esc(p.name)}</div><div class="ts">${esc(sub)}</div>${p.kind === "station" ? bullets(p.routes) : ""}`;
   }
   // Highlight whole routes: the lines under the pointer, or every line serving the hovered stop/station
@@ -2167,7 +2226,9 @@
   const SEL_LAYERS = ["grocery", "gyms", "places", "bus-stops", "subway-stations"];
   let selLines = { sub: "", bus: "" };
   function selectMarker(f) {
-    const p = f.properties, layer = f.layer.id.replace(/-(hover|sel|sel-ring)$/, "");
+    const p = f.properties, layer = f.layer.id.replace(/-(hover|sel|sel-ring|count)$/, "");
+    if (isCluster(layer, p))
+      return map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(GROUP_SPLIT_Z, Math.floor(map.getZoom()) + 2) });
     if (state.marker && state.marker.layer === layer && state.marker.key === p.key) return clearMarker();
     const src = { grocery: L.grocery, gyms: L.gyms, places: L.places, "bus-stops": L.bus, "subway-stations": L.subway?.stations }[layer] || [];
     const keyOf = layer === "subway-stations" ? (r) => r[2] + "|" + r[3] : layer === "bus-stops" ? (r) => r[2] : (r) => r[3] || r[2];
@@ -2197,7 +2258,7 @@
   function applyMarkerSel() {
     const m = state.marker;
     if (map) for (const id of SEL_LAYERS) for (const lid of [id + "-sel", id + "-sel-ring"])
-      if (map.getLayer(lid)) map.setFilter(lid, m && m.layer === id ? withBoro(["==", ["get", "key"], m.key]) : SEL_NONE);
+      if (map.getLayer(lid)) map.setFilter(lid, m && m.layer === id ? withBoro(["in", KEY_SEP + m.key + KEY_SEP, ["get", "keys"]]) : SEL_NONE);
     if (map?.getLayer("parks-sel")) map.setFilter("parks-sel", m?.layer === "parks" ? ["==", ["get", "pid"], m.key] : PARK_NONE);
     selLines = { sub: m?.layer === "subway-stations" ? m.routes : "", bus: m?.layer === "bus-stops" ? m.routes : "" };
     lineHoverKey = "\u0000"; setLineHover("", "");
