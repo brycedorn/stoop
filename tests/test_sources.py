@@ -278,25 +278,6 @@ def test_airport_route_cards():
     assert card["legs"][-1]["fixed"] and card["legs"][-1]["label"] == "AirTrain JFK" and card["car"] == 31
 
 
-def test_runner_hex_score():
-    from stoop.sources.runner_hexes import hex_center, runhex_score
-    assert hex_center(0, 0) == (0, 0) and round(hex_center(1, 0)[0]) == 260 and hex_center(0, 2)[1] == 450
-    hexes = {"0,0": 5, "1,0": 4, "0,1": 1, "40,0": 5}          # (40,0) is ~10 km away: ignored
-    assert runhex_score((0, 0), hexes) == (5 + 4 + 1) / 3 * 20
-    assert runhex_score((0, 0), {"0,0": 0}) == 0                # painted 0 = checked, no runners
-    assert runhex_score((0, 0), {"40,0": 5}) is None            # nothing painted nearby = no data
-
-
-def test_hex_ring_round_trip():
-    from stoop.sources.runner_hexes import KX, KY, hex_center, hex_ring
-    ring = hex_ring(10, -4)
-    assert len(ring) == 7 and ring[0] == ring[-1]
-    cx, cy = hex_center(10, -4)
-    mx = sum(p[0] for p in ring[:6]) / 6 * KX
-    my = sum(p[1] for p in ring[:6]) / 6 * KY
-    assert abs(mx - cx) < 1 and abs(my - cy) < 1       # the outline is centered on its hex (within a meter)
-
-
 def test_run_routes_score_is_access_only():
     import pandas as pd
     from stoop.sources.run_routes import run5k_scores
@@ -311,7 +292,7 @@ def test_run_routes_score_is_access_only():
 
 def test_run_routes_estimate_uses_nearest_access_point():
     from stoop.sources.run_routes import WALK_DETOUR, WALK_M_PER_MIN, estimate_minutes
-    from stoop.sources.runner_hexes import KX
+    from stoop.geo import HEX_KX as KX
     routes = [{"id": "a", "access": [[-73.95 + 2000 / KX, 40.72], [-73.95 + 800 / KX, 40.72]]}]
     m = estimate_minutes({"n1": [-73.95, 40.72]}, routes)
     assert m.loc["n1", "a"] == pytest.approx(800 * WALK_DETOUR / WALK_M_PER_MIN, rel=1e-3)
@@ -322,7 +303,7 @@ _NODE = [1000]
 
 def _way(lat, lon0, km, tags=None, start=None, end=None, n=10):
     """Made-up OSM way running east from (lat, lon0); shares nodes with others only via start/end."""
-    from stoop.sources.runner_hexes import KX
+    from stoop.geo import HEX_KX as KX
     nodes = []
     for _ in range(n + 1):
         _NODE[0] += 1
@@ -347,7 +328,7 @@ def test_run_routes_runnable_filters():
 
 def test_run_routes_networks_length_span_and_names():
     from stoop.sources.run_routes import networks, route_networks
-    from stoop.sources.runner_hexes import KX
+    from stoop.geo import HEX_KX as KX
     g1 = _way(40.72, -73.95, 1.0, {"name": "Waterfront Greenway"}, end=1)
     g2 = _way(40.72, -73.95 + 1000 / KX, 1.0, {"name": "Waterfront Greenway"}, start=1, end=2)
     g3 = _way(40.72, -73.95 + 2000 / KX, 1.0, start=2)
@@ -366,7 +347,7 @@ def test_run_routes_networks_length_span_and_names():
 
 def test_run_routes_join_small_mapping_gaps_and_greenway_share():
     from stoop.sources.run_routes import JOIN_GAP_M, networks, route_networks
-    from stoop.sources.runner_hexes import KX
+    from stoop.geo import HEX_KX as KX
     a = _way(40.72, -73.95, 1.5, {"name": "East River Esplanade"}, start=10, end=11)
     b = _way(40.72, -73.95 + (1500 + JOIN_GAP_M / 2) / KX, 1.5, {"name": "East River Esplanade"}, start=12)
     far = _way(40.72, -73.95 + (3000 + 40) / KX, 1.0, start=13)          # across a street: stays apart
@@ -410,10 +391,3 @@ def test_run_routes_main_route_is_population_weighted():
     routes = pd.Series(["Park X", "Park Y", "Park X", None], index=[0, 1, 2, 3])
     m = main_route(grid, routes)
     assert m["A"] == "Park Y" and "B" not in m.index
-
-
-def test_runner_hexes_refuses_restricted_files():
-    from stoop.sources.runner_hexes import is_restricted
-    assert is_restricted({"meta": {"contains": "provider_api_derived"}})
-    assert not is_restricted({"meta": {"sources": ["gpx", "osm_paths"], "source": "my GPX runs"}})
-    assert not is_restricted({"hexes": {}})

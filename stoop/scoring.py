@@ -86,12 +86,6 @@ FACTORS: dict[str, dict] = {
         "help": "Lower population density. Leave at 0 if you don't mind crowds.",
         "components": [("pop_density_km2", -1, 1.0)],
     },
-    "runhex": {
-        "label": "Runner traffic (hex data)",
-        "help": "Runner traffic by hex (0-5) from your runner-hex data file: the busiest few within ~1 km. "
-                "No hex nearby = no data.",
-        "components": [("runhex_score", "abs", 1.0)],
-    },
     "run5k": {
         "label": "5K routes",
         "help": "Walk to the nearest car-free route long enough for a 5K: park loops, greenways, waterfront paths "

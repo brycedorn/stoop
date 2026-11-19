@@ -279,20 +279,6 @@ def bus_routes(ctx) -> dict:
     return {"type": "FeatureCollection", "features": feats}
 
 
-def runner_hex_layer(ctx) -> dict:
-    """The runner hexes from your runner-traffic file as polygons with their value, for the map (read-only)."""
-    from .sources import runner_hexes as rh
-    got = rh.load(ctx)
-    if not got:
-        return {"type": "FeatureCollection", "features": []}
-    hexes, size = got
-    feats = [{"type": "Feature", "properties": {"v": v},
-              "geometry": {"type": "Polygon", "coordinates": [rh.hex_ring(*map(int, k.split(",")), size)]}}
-             for k, v in hexes.items()]
-    log.info("layers: %d runner hexes", len(feats))
-    return {"type": "FeatureCollection", "features": feats}
-
-
 # Airport markers (terminal areas). Not borough-tagged on purpose: they stay on the map whatever you filter.
 AIRPORT_MARKERS = [
     (-73.7781, 40.6413, "John F. Kennedy International", "JFK"),
@@ -311,7 +297,7 @@ def _route_key(r: str):
     return (m.group(1), int(m.group(2) or 0), m.group(3)) if m else (r, 0, "")
 
 
-BUILDERS = {"parks": parks, "places": places, "grocery": grocery, "gyms": gyms, "airports": airports, "runhex": runner_hex_layer,
+BUILDERS = {"parks": parks, "places": places, "grocery": grocery, "gyms": gyms, "airports": airports,
             "subway": subway, "bus": bus_stops,
             "bus_routes": bus_routes}
 

@@ -1,7 +1,7 @@
 """Neighborhoods, Census population, the analysis grid, and spatial helpers.
 
 The grid is a set of hex cells (default 150 m center to corner, ~260 m across) covering NYC land, on the
-same lattice as the runner hexes (pointy-top, axial q/r on the planar lon*KX, lat*KY projection), so the
+pointy-top lattice (axial q/r on the planar lon*KX, lat*KY projection below), so the
 browser can rebuild any cell from (q, r). Each cell knows its NTA and an estimated population. Most factors are
 computed per cell ("what can I reach from here?") and then averaged up to the NTA, weighted by population, so a
 neighborhood's score reflects where people live. While a step runs, every per-cell value it averages with a name
@@ -102,8 +102,13 @@ def load_tracts(ctx: Context):
 # --- Grid -------------------------------------------------------------------
 
 HEX_LAT0 = 40.7
-HEX_KX = 111320 * float(np.cos(np.radians(HEX_LAT0)))   # same projection as sources.runner_hexes
+HEX_KX = 111320 * float(np.cos(np.radians(HEX_LAT0)))   # meters per degree of longitude at NYC
 HEX_KY = 110540.0
+
+
+def to_grid_xy(lon: float, lat: float) -> tuple[float, float]:
+    """Lon/lat to the grid's planar meters."""
+    return lon * HEX_KX, lat * HEX_KY
 
 
 def hex_lattice(lon_min, lat_min, lon_max, lat_max, size: float):

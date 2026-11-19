@@ -440,7 +440,6 @@ details.how li + li { margin-top: 4px; }
 }
 .sw-out { width: 16px; height: 11px; border: 1px solid var(--rule); border-radius: 2px; }
 .sw-short { width: 16px; height: 11px; border: 1.5px dashed var(--ink); border-radius: 2px; background: var(--wash); }
-.sw-runhex { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: #eb6834; border-radius: 0; }
 .sw-hexes.few { opacity: .35; }
 .sw-hexes { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: linear-gradient(90deg, #f19560 50%, #257c3a 50%); border-radius: 0; }
 .map-tools { position: absolute; top: 14px; left: 14px; right: 60px; z-index: 3; display: flex; gap: 8px; align-items: flex-start; pointer-events: none; }

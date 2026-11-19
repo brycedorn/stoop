@@ -30,7 +30,7 @@ import pandas as pd
 import requests
 
 from ..scoring import run5k_curve
-from .runner_hexes import KX, KY, to_xy
+from ..geo import HEX_KX as KX, HEX_KY as KY, to_grid_xy as to_xy
 
 log = logging.getLogger("stoop.run_routes")
 NAME = "run_routes"

@@ -58,13 +58,12 @@ def test_drop_stray_parts_keeps_islands_drops_slivers():
     assert drop_stray_parts(main) is main
 
 
-def test_hex_lattice_matches_runner_hex_projection_and_rounds_back():
+def test_hex_lattice_centers_and_rounds_back():
     from stoop import geo
-    from stoop.sources.runner_hexes import hex_center
     q, r, x, y = geo.hex_lattice(-74.0, 40.70, -73.99, 40.71, 150)
     assert len(q) > 20
     for qi, ri, xi, yi in list(zip(q, r, x, y))[::7]:
-        assert (xi, yi) == pytest.approx(hex_center(int(qi), int(ri), 150))   # same lattice as runner hexes
+        assert (xi, yi) == pytest.approx((150 * 3 ** 0.5 * (qi + ri / 2), 225 * ri))   # pointy-top axial centers
         assert geo.hex_at(xi + 40, yi - 60, 150) == (qi, ri)                 # a point inside rounds to its hex
     # the box is covered: every point in it is within one hex radius of a center
     pts = np.column_stack([x, y])

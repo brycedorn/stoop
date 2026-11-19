@@ -6,7 +6,6 @@ neighborhoods on what matters to you, and you tune the weights live on a map.
 | Factor | Source |
 |---|---|
 | Running | OpenStreetMap paths, NYC Parks, your own GPS runs |
-| Runner traffic | A runner-hex file (0-5 per hex) made by a separate tool; format in `stoop/sources/runner_hexes.py` |
 | 5K routes | Walk to the nearest car-free route long enough for a 5K: park loops, greenways, waterfront paths (OpenStreetMap) |
 | Airports | Routed transit time to JFK, LaGuardia, Newark |
 | Your bars & restaurants | Shown on the map (geocoded with OSM Nominatim); not scored |
@@ -43,7 +42,6 @@ start web\index.html              # Windows; or just double-click it
 3. **Optional inputs** (each one makes a factor personal):
    - `inputs/places.csv`: your bars and restaurants (see `places.example.csv`)
    - `inputs/activities/`: GPS files of your own runs, from any app (see the README there)
-   - `inputs/runner_hexes.json`: runner traffic by hex (0-5), from a separate tool
    - `inputs/rents/`: optional listing rent CSVs (see the README there); local only, never published
 4. **Run it:**
    ```bash

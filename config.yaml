@@ -25,7 +25,7 @@ you:
 # Walk radius used for "what's near me" counts. ~1 km ≈ 12-15 min walk.
 walk_radius_m: 1000
 grid: hex                 # analysis grid: hex (needed for the hex view) or square
-grid_hex_m: 150           # hex size, center to corner (~260 m across); same lattice as the runner hexes
+grid_hex_m: 150           # hex size, center to corner (~260 m across)
 grid_cell_m: 200          # square cell size, only used with grid: square
 
 # Every factor is scored 0-100. These are default slider weights; the map
@@ -44,7 +44,6 @@ default_weights:
   citibike: 3
   size: 8
   familiarity: 0          # needs liked_neighborhoods
-  runhex: 0               # needs a runner-hex file (sources.runner_hexes); never restricted third-party data
   run5k: 10               # walk to a car-free 5K route (OpenStreetMap park loops, greenways)
 
 census:
@@ -83,8 +82,6 @@ sources:
   # Census ACS estimates.
   rents_dir: inputs/rents
   rent_csv_url: ""
-  # Runner traffic by hex, made by a separate tool (format: stoop/sources/runner_hexes.py). Path or file in inputs/.
-  runner_hexes: inputs/runner_hexes.json
 
 # Real transit routing (commute step) with r5py. R5 needs Java 21 specifically; this points r5py at it
 # without changing your default Java. Leave java_home empty to use the JAVA_HOME environment variable.

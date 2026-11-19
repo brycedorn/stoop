@@ -26,7 +26,7 @@
   const GROUPS = [
     { id: "cost", title: "Cost & space", keys: ["rent", "size", "space"], color: { light: "#2a78d6", dark: "#3987e5" } },
     { id: "move", title: "Getting around", keys: ["commute", "airports", "citibike", "errands"], color: { light: "#eb6834", dark: "#d95926" } },
-    { id: "life", title: "Lifestyle & outdoors", keys: ["running", "run5k", "gym", "runhex", "green", "favorites", "familiarity"], color: { light: "#1baf7a", dark: "#199e70" } },
+    { id: "life", title: "Lifestyle & outdoors", keys: ["running", "run5k", "gym", "green", "favorites", "familiarity"], color: { light: "#1baf7a", dark: "#199e70" } },
     { id: "env", title: "Safety & environment", keys: ["safety", "quiet", "air"], color: { light: "#6f6d68", dark: "#9a988f" } },
   ];
   const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => g.keys.map((k) => [k, g])));
@@ -53,13 +53,12 @@
     quiet: "M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z",
   };
   ICON_PATHS.run5k = "M4 19c0-3.5 3-4 5.5-4S15 14 15 11s-3-3.5-3-3.5M15 3.5v8M15 3.5h5l-1.5 2.25L20 8h-5";
-  ICON_PATHS.runhex = "M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5zM8 13.5c1.5 0 1.2-3 3-3s1.5 3 3 3 1.2-3 2-3";
   const icon = (k) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON_PATHS[k] || "M12 12h.01"}"/></svg>`;
   // A tag: tinted chip + colored icon (identity) + ink text (dataviz: text never wears the series color)
   const tag = (k, { weak = false, text = null } = {}) =>
     `<span class="tag${weak ? " weak" : ""}" style="--tc:${groupColor(k)}" title="${esc(META.factors[k]?.label || k)}">${icon(k)}${weak ? "low " : ""}${esc(text ?? short(k))}</span>`;
   const SHORT = {
-    favorites: "Your places", gym: "Gyms", airports: "Airports", runhex: "Runner traffic", run5k: "5K routes", familiarity: "Familiar area", size: "Apartment size",
+    favorites: "Your places", gym: "Gyms", airports: "Airports", run5k: "5K routes", familiarity: "Familiar area", size: "Apartment size",
     space: "Breathing room", citibike: "Citi Bike", errands: "Errands", green: "Green space",
   };
   const short = (k) => SHORT[k] || META.factors[k].label;
@@ -88,7 +87,7 @@
   const PRESETS = {
     "My defaults": null,
     Balanced: Object.fromEntries(AVAILABLE.map((k) => [k, k === "space" ? 0 : 10])),
-    Runner: { running: 30, run5k: 20, runhex: 10, green: 10, commute: 15, rent: 10, gym: 5 },
+    Runner: { running: 35, run5k: 25, green: 10, commute: 15, rent: 10, gym: 5 },
     "Budget first": { rent: 40, commute: 25, size: 10, safety: 10, errands: 10, running: 5 },
     Quiet: { quiet: 30, green: 20, safety: 15, air: 15, space: 10, rent: 5, commute: 5 },
     Familiar: { familiarity: 30, commute: 25, rent: 20, running: 15, green: 10 },
@@ -1674,7 +1673,6 @@
     { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-count", "gyms-sel", "gyms-sel-ring"] },
     { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
     { id: "airports", label: "Airports", has: () => L.airports?.length, layers: ["airports", "airports-hover", "airport-codes"] },
-    { id: "runhex", label: "Runner hexes", has: () => L.runhex?.features?.length, layers: ["runhex-fill", "runhex-line"] },
     { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-line"] },
   ];
   let layerOn = Object.fromEntries(CONTEXT.map((c) => [c.id, true]));
@@ -1719,14 +1717,6 @@
       map.addLayer({ id: "parks-fill", type: "fill", source: "parks", paint: { "fill-color": pk.fill, "fill-opacity": pk.op } }, beforeId);
       map.addLayer({ id: "parks-line", type: "line", source: "parks", minzoom: 12,
         paint: { "line-color": pk.line, "line-width": 0.7 } }, beforeId);
-    }
-    // Runner hexes from your runner-traffic data (inputs/runner_hexes.json): orange, stronger = busier
-    if (L.runhex?.features?.length) {
-      map.addSource("runhex", { type: "geojson", data: L.runhex });
-      map.addLayer({ id: "runhex-fill", type: "fill", source: "runhex",
-        paint: { "fill-color": "#eb6834", "fill-opacity": ["interpolate", ["linear"], ["get", "v"], 0, 0.07, 1, 0.2, 5, 0.7] } }, beforeId);
-      map.addLayer({ id: "runhex-line", type: "line", source: "runhex",
-        paint: { "line-color": "#eb6834", "line-width": 1, "line-opacity": 0.7 } }, beforeId);
     }
     const round = { "line-cap": "round", "line-join": "round" };
     // Route highlights use feature-state, never setFilter: a filter change re-tiles the whole source in the

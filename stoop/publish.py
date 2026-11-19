@@ -7,7 +7,7 @@ What's published is what stoop derives, never a source's own records:
   listing rents you supply locally are never published, not even through the calibration ratio;
 - context layers from open data (parks, subway, bus, grocery, gyms, airports), credited on the map.
 Nothing personal: it reads config.yaml only (never config.local.yaml), and leaves out your places, liked areas,
-your GPS runs and runner hexes. `check_site` refuses to finish if any of that shows up in the output.
+your GPS runs. `check_site` refuses to finish if any of that shows up in the output.
 
 The site goes to `site/` (gitignored) and, with --commit, onto the `gh-pages` branch as one new commit, without
 touching your working tree. Push it with `git push origin gh-pages`; GitHub Pages serves that branch.
@@ -31,9 +31,9 @@ log = logging.getLogger("stoop.publish")
 RENT_BAND = 500
 RESTRICTED_NAMES = ["listings"]   # plus config.local.yaml `publish.never_name`: sources the site must never name
 SITE_FILES = ["index.html", "app.js", "style.css", "fonts/schibsted-grotesk-latin.woff2", "fonts/OFL.txt"]
-PERSONAL_COLUMNS = {"familiar_dist_m", "fav_score", "fav_within_walk", "activity_density", "runhex_score"}
-PERSONAL_LAYERS = ("places", "runhex")
-PERSONAL_FACTORS = {"familiarity", "runhex"}
+PERSONAL_COLUMNS = {"familiar_dist_m", "fav_score", "fav_within_walk", "activity_density"}
+PERSONAL_LAYERS = ("places",)
+PERSONAL_FACTORS = {"familiarity"}
 
 
 def band(rent):
