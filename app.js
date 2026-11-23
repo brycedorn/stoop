@@ -40,14 +40,29 @@
   };
   const short = (k) => SHORT[k] || META.factors[k].label;
 
-  // Sequential ramp, 5 classes, orange (weak match) through gold to green (strong match): the hue says which end
-  // is good at a glance. Lightness still runs in one direction (light->dark on the light map, dark->light on the
-  // dark one), so the order holds for color-blind readers who can't separate orange from green.
-  // Steps are evenly spaced in OKLab lightness; the light end clears the basemap land (#f2f2f0 / #1a1a19) at 2:1.
-  const RAMP = {
-    light: ["#f19560", "#be9223", "#6a9228", "#257c3a", "#045d35"],
-    dark: ["#853e19", "#996b00", "#7fa034", "#6dc97d", "#93e7b3"],
+  // Match colors: one hue that gets stronger as the match does. Weak matches fade toward the map (each class has its
+  // own transparency), strong ones are saturated, so the eye goes to where things fit and "which end is good" needs
+  // no legend. One hue, so it reads the same for color-blind viewers. Blended over the basemap land (#f2f2f0 /
+  // #1a1a19) the five steps run one way in OKLab lightness, at least 0.06 apart. Plum is the default because nothing
+  // else on the map is plum (parks are green, water gray, subway lines are thin); indigo and teal are offered too.
+  const FADE = { light: [0.42, 0.6, 0.76, 0.9, 1], dark: [0.5, 0.6, 0.68, 0.74, 0.8] };   // on the dark map the strong end is light: kept see-through
+  const PALETTE_HEX = {
+    plum: { label: "Plum", light: ["#d9b3e0", "#c38ccd", "#a862b6", "#86409a", "#5e1f75"], dark: ["#6d3a7d", "#8a4d99", "#a967b6", "#c88fd3", "#e6c0ee"] },
+    indigo: { label: "Indigo", light: ["#b4c0fb", "#8c9ef2", "#6378e6", "#3f51c9", "#25339b"], dark: ["#2e3a85", "#3f50ad", "#5a6fd6", "#8797f0", "#bcc6fb"] },
+    teal: { label: "Teal", light: ["#a6dcd4", "#74c2b7", "#43a397", "#1f8278", "#0b5f58"], dark: ["#185c56", "#1f756d", "#2e968b", "#58b9ac", "#97ddd2"] },
   };
+  const rgba = (hex, a) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(",")},${a})`;
+  const PALETTES = Object.fromEntries(Object.entries(PALETTE_HEX).map(([k, p]) =>
+    [k, { label: p.label, light: p.light.map((c, i) => rgba(c, FADE.light[i])), dark: p.dark.map((c, i) => rgba(c, FADE.dark[i])) }]));
+  const ramp = () => (PALETTES[state.palette] || PALETTES.plum)[theme()];
+  // How strongly the colors cover the map: full at city zoom, fading as you zoom in so streets, parks and labels
+  // show through at street level; the legend's "Fill" slider scales it at any zoom.
+  const FILL_BASE = 0.88, FILL_HOVER = 1;
+  function fillOpacity(extra = null) {
+    const k = state.fill, hov = ["boolean", ["feature-state", "hover"], false];
+    const at = (f) => ["*", k * f, extra ? ["case", hov, FILL_HOVER, extra, 0.35, FILL_BASE] : ["case", hov, FILL_HOVER, FILL_BASE]];
+    return ["interpolate", ["linear"], ["zoom"], 12, at(1), 13.5, at(0.7), 15, at(0.45), 17, at(0.3)];
+  }
   const BASEMAP = {
     light: "https://tiles.openfreemap.org/styles/positron",
     dark: "https://tiles.openfreemap.org/styles/dark",
@@ -80,7 +95,7 @@
     boroughs: BOROUGHS.filter((b) => !(META.exclude_boroughs || []).includes(b)),
   });
   const AREA_DEFAULT = { on: false, km: 4.8, lon: null, lat: null };   // km internally; shown in miles
-  const state = { ...defaults(), area: { ...AREA_DEFAULT }, colorBy: "total", sort: "match", fixedScale: false, selected: null, hover: null, query: "", tab: "matches", addingDest: false };
+  const state = { ...defaults(), area: { ...AREA_DEFAULT }, palette: "plum", fill: 1, colorBy: "total", sort: "match", fixedScale: false, selected: null, hover: null, query: "", tab: "matches", addingDest: false };
   const SORTS = ["match", "rent", "commute", "size"];
   state.boroughs = new Set(state.boroughs);
   // Partner mode: a second set of priorities. Neighborhoods rank by the lower of the two matches ("best for both"),
@@ -128,6 +143,8 @@
       if (SORTS.includes(s.sort)) state.sort = s.sort;
       if (s.area && Number.isFinite(s.area.km)) state.area = { ...AREA_DEFAULT, ...s.area };
       if (typeof s.fixedScale === "boolean") state.fixedScale = s.fixedScale;
+      if (s.palette in PALETTE_HEX) state.palette = s.palette;
+      if (Number.isFinite(s.fill)) state.fill = Math.min(1, Math.max(0, s.fill));
     }
     shortlist = (JSON.parse(localStorage.getItem(SHORT_KEY) || "[]") || []).filter((id) => BY_ID.has(id));
     const d = JSON.parse(localStorage.getItem(DEST_KEY) || "null");
@@ -260,6 +277,7 @@
       localStorage.setItem(STORE_KEY, JSON.stringify({
         weights: state.people[0].weights, youName: state.people[0].name, partner: partner(), budget: state.budget, bedrooms: state.bedrooms, maxCommute: state.maxCommute,
         showOver: state.showOver, boroughs: [...state.boroughs], colorBy: state.colorBy, sort: state.sort, fixedScale: state.fixedScale, area: state.area,
+        palette: state.palette, fill: state.fill,
         excludeSeen: JSON.stringify(META.exclude_boroughs || []),
       }));
       localStorage.setItem(SHORT_KEY, JSON.stringify(shortlist));
@@ -1247,15 +1265,23 @@
     $("colorBy").onchange = (e) => { state.colorBy = e.target.value; update(); };
   }
   function renderLegend() {
-    const ramp = RAMP[theme()];
+    const cols = ramp();
     const vis = results.filter((r) => r.visible).map(colorValue).filter((v) => v != null);
     const banded = state.fixedScale || vis.length < 10;   // too few matches to split into fifths
     const lo = banded ? [0, ...thresholds] : [Math.min(...vis), ...thresholds];
     const ticks = lo.map((v) => Math.round(v));
-    const html = `<div class="swatches">${ramp.map((c) => `<span style="background:${c}"></span>`).join("")}</div>
+    const html = `<div class="swatches">${cols.map((c) => `<span style="background:${c}"></span>`).join("")}</div>
       <div class="ticks">${ticks.map((t) => `<span>${t}+</span>`).join("")}</div>
+      <div class="ends" aria-hidden="true"><span>weaker</span><span>stronger match</span></div>
       <div class="legend-foot"><span>${banded ? "20-point bands" : "Fifths of your matches"}</span>
-        <label title="Keep each shade's meaning fixed while you filter"><input type="checkbox" id="fixedScale" ${state.fixedScale ? "checked" : ""}>Fixed scale</label></div>`;
+        <label title="Keep each shade's meaning fixed while you filter"><input type="checkbox" id="fixedScale" ${state.fixedScale ? "checked" : ""}>Fixed scale</label></div>
+      <div class="legend-look">
+        <div class="pal" role="radiogroup" aria-label="Match colors">${Object.entries(PALETTES).map(([k, p]) =>
+          `<button type="button" role="radio" data-pal="${k}" aria-checked="${k === state.palette}" title="${p.label}" aria-label="${p.label}"
+            style="--c:${p[theme()][3]}"></button>`).join("")}</div>
+        <label class="fill-k">Fill <input type="range" id="fillK" min="0" max="100" step="5" value="${Math.round(state.fill * 100)}"
+          aria-label="How strongly the colors cover the map" aria-valuetext="${Math.round(state.fill * 100)}%"></label>
+      </div>`;
     if ($("legend")._html !== html) { $("legend").innerHTML = html; $("legend")._html = html; }
   }
   function renderLayersMenu() {
@@ -1284,6 +1310,20 @@
       if (e.target.id !== "fixedScale") return;
       state.fixedScale = e.target.checked;
       update();
+    });
+    $("legend").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-pal]");
+      if (!b || b.dataset.pal === state.palette) return;
+      state.palette = b.dataset.pal;
+      paintMatchColors(); renderLegend(); renderLayersMenu(); persist();
+      $("legend").querySelector(`[data-pal="${state.palette}"]`)?.focus();
+    });
+    // the fill slider repaints while it moves; the legend isn't rebuilt under the pointer
+    $("legend").addEventListener("input", (e) => {
+      if (e.target.id !== "fillK") return;
+      state.fill = +e.target.value / 100;
+      e.target.setAttribute("aria-valuetext", e.target.value + "%");
+      paintMatchColors(); persist();
     });
     closeOnOutside("layersBox");
   }
@@ -1795,7 +1835,7 @@
     const dark = theme() === "dark";
     map.addLayer({ id: "fill", type: "fill", source: "hoods", paint: {
       "fill-color": "rgba(0,0,0,0)",
-      "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.92, 0.78],
+      "fill-opacity": fillOpacity(),
     } }, firstLabel);
     addContextUnder(firstLabel, dark);
     addHexLayers(firstLabel, dark);
@@ -2346,16 +2386,16 @@
     map.setPaintProperty("hex-fill", "fill-color", hexFillColor());
   }
   function hexFillColor() {
-    const ramp = RAMP[theme()], v = ["get", "v"];
+    const c = ramp(), v = ["get", "v"];
     return ["case", [">=", v, 0],
-      ["step", v, ramp[0], thresholds[0], ramp[1], thresholds[1], ramp[2], thresholds[2], ramp[3], thresholds[3], ramp[4]],
+      ["step", v, c[0], thresholds[0], c[1], thresholds[1], c[2], thresholds[2], c[3], thresholds[3], c[4]],
       theme() === "dark" ? "rgba(240,239,236,0.10)" : "rgba(11,11,11,0.06)"];
   }
   function addHexLayers(beforeId, dark) {
     if (!HX) return;
     if (!map.getSource("hexes")) map.addSource("hexes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({ id: "hex-fill", type: "fill", source: "hexes", paint: { "fill-color": "rgba(0,0,0,0)",
-      "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, ["get", "few"], 0.3, 0.74] } }, beforeId);
+      "fill-opacity": fillOpacity(["get", "few"]) } }, beforeId);
     map.addLayer({ id: "hex-line", type: "line", source: "hexes", paint: {
       "line-color": ["case", ["boolean", ["feature-state", "hover"], false], dark ? "#f0efec" : "#0b0b0b", dark ? "#1a1a19" : "#ffffff"],
       "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2, 0.6],
@@ -2480,12 +2520,20 @@
     });
   }
 
+  // repaint the match colors and their strength (palette or fill slider changed)
+  function paintMatchColors() {
+    document.documentElement.style.setProperty("--ramp-lo", ramp()[1]);
+    document.documentElement.style.setProperty("--ramp-hi", ramp()[4]);
+    if (!map || !styleReady) return;
+    if (map.getLayer("fill")) { map.setPaintProperty("fill", "fill-color", fillExpression()); map.setPaintProperty("fill", "fill-opacity", fillOpacity()); }
+    if (map.getLayer("hex-fill")) { map.setPaintProperty("hex-fill", "fill-color", hexFillColor()); map.setPaintProperty("hex-fill", "fill-opacity", fillOpacity(["get", "few"])); }
+  }
   function fillExpression() {
-    const ramp = RAMP[theme()];
+    const c = ramp();
     const v = ["coalesce", ["feature-state", "v"], -1];
     return ["case",
       ["all", ["boolean", ["feature-state", "on"], false], [">=", v, 0]],
-      ["step", v, ramp[0], thresholds[0], ramp[1], thresholds[1], ramp[2], thresholds[2], ramp[3], thresholds[3], ramp[4]],
+      ["step", v, c[0], thresholds[0], c[1], thresholds[1], c[2], thresholds[2], c[3], thresholds[3], c[4]],
       ["boolean", ["feature-state", "short"], false], theme() === "dark" ? "rgba(240,239,236,0.16)" : "rgba(11,11,11,0.10)",
       "rgba(0,0,0,0)"];
   }
@@ -2644,7 +2692,7 @@
       styleReady = false;   // diff: false, because a diffed swap skips "style.load", which is what re-adds our layers
       map.setStyle(BASEMAP[theme()], { diff: false });
     }
-    renderLegend(); buildPriorities(); renderRanking(); renderShortlist(); renderDetail(); renderLayersMenu();
+    renderLegend(); buildPriorities(); renderRanking(); renderShortlist(); renderDetail(); renderLayersMenu(); paintMatchColors();
   }
   function setThemeMode(mode) {
     const before = theme();
@@ -2664,6 +2712,7 @@
     (META.rent_basis === "census" ? "Rents are Census-based estimates" : "Rents from listing data where available, else Census-based estimates") +
     `${RENT_BAND ? `, shown in $${fmtInt(RENT_BAND)} bands` : ""}.` +
     `${ROUTED ? " Commutes routed on MTA schedules." : ""}`;
+  paintMatchColors();   // the layers menu swatch follows the palette before the map is up
   buildFilters(); buildTabs(); bindLists(); buildPriorities(); buildColorBy(); bindDestMenu(); renderDestMenu(); renderLayersMenu(); bindLegend(); buildArea();
   update();
   initMap();
