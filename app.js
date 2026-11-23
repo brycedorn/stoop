@@ -547,7 +547,9 @@
     commute.oninput = () => { state.maxCommute = +commute.value; schedule(); };
     $("showOver").checked = state.showOver;
     $("showOver").onchange = (e) => { state.showOver = e.target.checked; update(); };
-    $("resetFilters").onclick = () => {
+    // one Reset by the match count (wide screens), one in the filter sheet (phones); CSS shows the right one
+    for (const b of document.querySelectorAll(".reset-filters")) b.onclick = resetFilters;
+    function resetFilters() {
       const d = defaults();
       Object.assign(state, { budget: d.budget, bedrooms: d.bedrooms, maxCommute: d.maxCommute, showOver: d.showOver,
         boroughs: new Set(d.boroughs) });
@@ -580,8 +582,9 @@
     $("budgetOut").textContent = "$" + fmtInt(state.budget);
     $("commuteOut").textContent = state.maxCommute + " min";
     const n = state.boroughs.size, d = defaults();
-    $("resetFilters").hidden = state.budget === d.budget && state.bedrooms === d.bedrooms && state.maxCommute === d.maxCommute &&
+    const unchanged = state.budget === d.budget && state.bedrooms === d.bedrooms && state.maxCommute === d.maxCommute &&
       state.showOver === d.showOver && !state.area.on && n === d.boroughs.length && d.boroughs.every((b) => state.boroughs.has(b));
+    for (const b of document.querySelectorAll(".reset-filters")) b.hidden = unchanged;
     $("boroughSummary").textContent = n === BOROUGHS.length ? "All" : n === 0 ? "None" :
       n <= 2 ? [...state.boroughs].join(", ") : `${n} of ${BOROUGHS.length}`;
     const shown = results.filter((r) => r.rank).length;
@@ -949,7 +952,9 @@
   function renderPeople() {
     const q = partner(), box = $("people");
     const invite = `<button class="btn ghost sm" type="button" id="invite">${SEND}${q ? `Send ${esc(q.name)} the ranking page` : "Send your partner a ranking page"}</button>`;
-    const note = peopleNote ? `<p class="ok-line" role="status">${esc(peopleNote)}</p>` : "";
+    // the "their priorities are in" note belongs to the partner who just arrived: gone once they're renamed or removed
+    const note = peopleNote && q && peopleNote.who === q && peopleNote.name === q.name
+      ? `<p class="ok-line" role="status">${esc(peopleNote.text)}</p>` : "";
     if (!q) {
       box.innerHTML = `${note}<div class="who-actions"><button class="btn ghost sm" type="button" id="addPartner">${PLUS}Add a partner's priorities</button>${invite}</div>
         <p class="ts" id="peopleMsg" role="status">Rank for two: each of you sets priorities, and the list shows where you both do well.
@@ -982,7 +987,7 @@
       q.pin = d ? { lat: d.lat, lon: d.lon } : null;
       update();
     };
-    if ($("removePartner")) $("removePartner").onclick = () => { state.people.length = 1; setEditing(0); };
+    if ($("removePartner")) $("removePartner").onclick = () => { state.people.length = 1; peopleNote = null; setEditing(0); };
   }
   // A link to the ranking page, signed with your name; what comes back adds them here (importPartner)
   async function sendInvite() {
@@ -1776,6 +1781,7 @@
     update();            // recomputes commutes first, so the menu's hint knows whether any pin is estimated
     renderDestMenu();
     renderDestPins();
+    renderPeople();      // the partner's "Commutes to" list is the same pins (a removed one reads "same as yours")
   }
 
   function addLayers() {
@@ -2663,7 +2669,7 @@
   initMap();
   if (linkSelect) select(linkSelect, true);
   if (linkImported) {   // a partner's ranking just arrived: show it where it's edited
-    peopleNote = `${linkImported}'s priorities are in. The list now ranks for both of you.`;
+    peopleNote = { who: partner(), name: linkImported, text: `${linkImported}'s priorities are in. The list now ranks for both of you.` };
     setTab("priorities"); renderPeople(); renderDestMenu();
   }
   $("copyLink").onclick = async () => {

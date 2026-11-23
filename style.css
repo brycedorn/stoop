@@ -113,7 +113,11 @@ code { font-family: var(--mono); font-size: 12px; background: var(--wash); paddi
 .btn .ic { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .link-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 2px 0 10px; }
 .link-row .ts { margin: 0; color: var(--ink-3); font-size: 12px; }
-#resetFilters { text-decoration: underline; text-underline-offset: 3px; }
+/* sits on the same baseline as the over-budget toggle (both align to the controls' bottom edge), never on a row of its own */
+.reset-filters { text-decoration: underline; text-underline-offset: 3px; }
+.reset-filters[hidden] { display: none; }
+.reset-in-sheet { display: none; }
+.reset-by-count { margin-left: -16px; flex: none; }   /* "9 of 197 match  Reset": right next to the count it changes */
 .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .icon-btn {
   display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
@@ -168,10 +172,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
 .dd-btn::after { content: ""; flex: none; width: 6px; height: 6px; border: solid var(--ink-3); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg) translateY(-2px); }
 .dropdown summary:hover .dd-btn { border-color: var(--rule); }
 .dd-btn.edited::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--mark); box-shadow: 0 0 0 1px var(--ink); }
-.dest-menu { min-width: 300px; padding: 10px; }
-.area-menu { width: 300px; padding: 10px; }
+.dd-menu.dest-menu { min-width: 320px; padding: 10px; }
+.dd-menu.area-menu { width: 340px; padding: 10px; }
 .area-menu .area-on { padding: 6px 4px; font-weight: 550; }
-.area-menu .area-range { width: auto; margin: 6px 4px 2px; }
+.dd-menu.area-menu .area-range { width: auto; margin: 6px 4px 2px; }
 .area-menu:has(#areaOn:not(:checked)) .area-range { opacity: .45; }
 /* area center: round target pin (not a teardrop like commute destinations, not a rank badge) */
 .area-pin {
@@ -202,14 +206,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 190px; padding: 6px;
   background: var(--raised); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border);
 }
-.dd-menu label { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-sm); cursor: pointer; }
-.dd-menu label:hover { background: var(--wash); }
-.dd-menu input { accent-color: var(--accent); width: 16px; height: 16px; }
+/* menu rows: checkbox/radio labels. Scoped so a slider (.range) or a text box in a menu keeps its own size */
+.dd-menu label:not(.range) { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-sm); cursor: pointer; }
+.dd-menu label:not(.range):hover { background: var(--wash); }
+.dd-menu input:is([type=checkbox], [type=radio]) { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
 
 .filters-toggle { display: none; }
 /* laptops: give the one-row top bar room (brand tagline, slimmer bedroom buttons, radius center in the tooltip) */
 @media (max-width: 1400px) and (min-width: 861px) {
   .tagline { display: none; }
+  .topbar { gap: 16px; }
+  .filters { gap: 14px; }
   .seg-row span { min-width: 34px; padding: 0 8px; }
 }
 @media (max-width: 1500px) and (min-width: 861px) {
@@ -703,6 +710,8 @@ details.more td:last-child { text-align: right; font-variant-numeric: tabular-nu
   .topbar.open .filters-toggle::after { transform: rotate(-135deg) translateY(-2px); }
   .topbar:not(.open) .filters { display: none; }
   .filters { order: 3; flex-basis: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .reset-by-count { display: none; }
+  .reset-in-sheet { display: inline-flex; grid-column: 1 / -1; justify-self: start; min-height: 40px; margin-left: -6px; }
   .seg { grid-column: 1 / -1; }
   .seg-row { display: flex; }
   .seg-row label { flex: 1; }
@@ -712,7 +721,7 @@ details.more td:last-child { text-align: right; font-variant-numeric: tabular-nu
   .dd-btn { height: 44px; max-width: none; }
   .toggle .t-long { display: inline; }
   .toggle .t-short { display: none; }
-  .dest-menu { min-width: 0; width: calc(100vw - 32px); }
+  .dd-menu.dest-menu { min-width: 0; width: calc(100vw - 32px); }
   .dest-row input[type=text], .addr input { height: 44px; }
   .search input, .colorby select { height: 44px; }
   .maplibregl-ctrl-group button { width: 40px !important; height: 40px !important; }
@@ -745,7 +754,7 @@ details.more td:last-child { text-align: right; font-variant-numeric: tabular-nu
   .btn.sm { min-height: 40px; }
   .dest-pin { width: 30px; height: 30px; }
   .area-pin { width: 34px; height: 34px; }
-  .area-menu { width: calc(100vw - 32px); left: auto; right: 0; }   /* Area sits in the right column on phones */
+  .dd-menu.area-menu { width: calc(100vw - 32px); left: auto; right: 0; }   /* Area sits in the right column on phones */
   .pin { min-width: 24px; height: 24px; border-radius: 12px; font-size: 11px; }   /* the small phone map needs room around them */
   .legend-foot label { min-height: 36px; padding-left: 6px; }
   .legend-foot input { width: 18px; height: 18px; }
