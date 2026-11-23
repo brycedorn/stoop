@@ -58,8 +58,21 @@ with sync_playwright() as pw:
     check("fill slider scales the colors", abs(opacity_at(page, 11) - 0.3 * o11) < 0.02, round(opacity_at(page, 11), 3))
     page.evaluate(f"() => {S}.map().jumpTo({{center: [-73.93, 40.715], zoom: 11}})"); page.wait_for_timeout(600); idle(page)
     page.screenshot(path=str(OUT / "colors_teal_fill30.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
+    # edges: the shapes stay clear and a band inside each outline carries the color
+    page.click('#legend [data-shade="edge"]'); page.wait_for_timeout(400)
+    st = page.evaluate("""() => { const m = window.__stoop.map();
+      return { fill: JSON.stringify(m.getPaintProperty('fill', 'fill-opacity')), edge: JSON.stringify(m.getPaintProperty('edge', 'line-opacity')),
+               off: JSON.stringify(m.getPaintProperty('edge', 'line-offset')) }; }""")
+    check("edges: no fill inside the shapes", st["fill"].endswith(",0.22,0]"), st["fill"])
+    check("edges: band drawn at the fill strength", "0.3" in st["edge"], st["edge"])
+    check("edges: band offset to one side", '"zoom"' in st["off"], st["off"][:60])
+    chip = page.evaluate("() => { const b = document.querySelector('#legend [data-pal]').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }")
+    check("palette chips are rounded rectangles", chip[0] > chip[1], chip)
+    page.screenshot(path=str(OUT / "colors_edges.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
     # remembered after a reload
     page.reload(); ready(page)
+    check("edges remembered", page.evaluate(f"() => {S}.state.shade") == "edge")
+    page.click('#legend [data-shade="fill"]'); page.wait_for_timeout(300)
     check("palette remembered", page.evaluate(f"() => {S}.state.palette") == "teal")
     check("fill remembered", abs(page.evaluate(f"() => {S}.state.fill") - 0.3) < 1e-9)
     # dark theme: indigo, then open a neighborhood so the hexes draw in the same colors

@@ -55,11 +55,32 @@
   const PALETTES = Object.fromEntries(Object.entries(PALETTE_HEX).map(([k, p]) =>
     [k, { label: p.label, light: p.light.map((c, i) => rgba(c, FADE.light[i])), dark: p.dark.map((c, i) => rgba(c, FADE.dark[i])) }]));
   const ramp = () => (PALETTES[state.palette] || PALETTES.plum)[theme()];
+  const solidRamp = () => (PALETTE_HEX[state.palette] || PALETTE_HEX.plum)[theme()];
+  // "Edges" shading: instead of filling each shape, color a band just inside its outline, so the streets and parks
+  // inside stay in plain view and the band can be fully opaque. A line offset by half its width toward the inside
+  // draws that band; which side is "inside" follows the ring's direction, so every ring is rewound first
+  // (outer rings counterclockwise, holes clockwise in lon/lat) and EDGE_SIDE picks the side on screen.
+  const EDGE_SIDE = -1;
+  const ringArea = (ring) => { let a = 0; for (let i = 0, n = ring.length; i < n; i++) { const [x1, y1] = ring[i], [x2, y2] = ring[(i + 1) % n]; a += x1 * y2 - x2 * y1; } return a / 2; };
+  const rewindPoly = (poly) => poly.map((ring, i) => ((ringArea(ring) > 0) === (i === 0) ? ring : ring.slice().reverse()));
+  function rewind(geom) {
+    if (!geom) return geom;
+    if (geom.type === "Polygon") return { ...geom, coordinates: rewindPoly(geom.coordinates) };
+    if (geom.type === "MultiPolygon") return { ...geom, coordinates: geom.coordinates.map(rewindPoly) };
+    return geom;
+  }
+  // band width: neighborhoods get a band that grows with zoom; hexes 10 m (neighbors each draw one, so 20 m between them)
+  const EDGE_W_HOOD = ["interpolate", ["exponential", 1.6], ["zoom"], 9, 2.5, 12, 6, 15, 16, 18, 30];
+  const HEX_BAND_M = 10, M_PER_PX_Z0 = 78271.52 * Math.cos((40.7 * Math.PI) / 180);
+  const EDGE_W_HEX = ["interpolate", ["exponential", 2], ["zoom"], 12, (HEX_BAND_M / M_PER_PX_Z0) * 2 ** 12, 18, (HEX_BAND_M / M_PER_PX_Z0) * 2 ** 18];
+  const halfOff = (w) => ["interpolate", w[1], w[2], ...w.slice(3).map((x, i) => (i % 2 ? (EDGE_SIDE * x) / 2 : x))];
   // How strongly the colors cover the map: full at city zoom, fading as you zoom in so streets, parks and labels
   // show through at street level; the legend's "Fill" slider scales it at any zoom.
   const FILL_BASE = 0.88, FILL_HOVER = 1;
   function fillOpacity(extra = null) {
-    const k = state.fill, hov = ["boolean", ["feature-state", "hover"], false];
+    const hov = ["boolean", ["feature-state", "hover"], false];
+    if (state.shade === "edge") return ["case", hov, 0.22, 0];   // a light wash only under the pointer
+    const k = state.fill;
     const at = (f) => ["*", k * f, extra ? ["case", hov, FILL_HOVER, extra, 0.35, FILL_BASE] : ["case", hov, FILL_HOVER, FILL_BASE]];
     return ["interpolate", ["linear"], ["zoom"], 12, at(1), 13.5, at(0.7), 15, at(0.45), 17, at(0.3)];
   }
@@ -95,7 +116,7 @@
     boroughs: BOROUGHS.filter((b) => !(META.exclude_boroughs || []).includes(b)),
   });
   const AREA_DEFAULT = { on: false, km: 4.8, lon: null, lat: null };   // km internally; shown in miles
-  const state = { ...defaults(), area: { ...AREA_DEFAULT }, palette: "plum", fill: 1, colorBy: "total", sort: "match", fixedScale: false, selected: null, hover: null, query: "", tab: "matches", addingDest: false };
+  const state = { ...defaults(), area: { ...AREA_DEFAULT }, palette: "plum", fill: 1, shade: "fill", colorBy: "total", sort: "match", fixedScale: false, selected: null, hover: null, query: "", tab: "matches", addingDest: false };
   const SORTS = ["match", "rent", "commute", "size"];
   state.boroughs = new Set(state.boroughs);
   // Partner mode: a second set of priorities. Neighborhoods rank by the lower of the two matches ("best for both"),
@@ -145,6 +166,7 @@
       if (typeof s.fixedScale === "boolean") state.fixedScale = s.fixedScale;
       if (s.palette in PALETTE_HEX) state.palette = s.palette;
       if (Number.isFinite(s.fill)) state.fill = Math.min(1, Math.max(0, s.fill));
+      if (s.shade === "fill" || s.shade === "edge") state.shade = s.shade;
     }
     shortlist = (JSON.parse(localStorage.getItem(SHORT_KEY) || "[]") || []).filter((id) => BY_ID.has(id));
     const d = JSON.parse(localStorage.getItem(DEST_KEY) || "null");
@@ -277,7 +299,7 @@
       localStorage.setItem(STORE_KEY, JSON.stringify({
         weights: state.people[0].weights, youName: state.people[0].name, partner: partner(), budget: state.budget, bedrooms: state.bedrooms, maxCommute: state.maxCommute,
         showOver: state.showOver, boroughs: [...state.boroughs], colorBy: state.colorBy, sort: state.sort, fixedScale: state.fixedScale, area: state.area,
-        palette: state.palette, fill: state.fill,
+        palette: state.palette, fill: state.fill, shade: state.shade,
         excludeSeen: JSON.stringify(META.exclude_boroughs || []),
       }));
       localStorage.setItem(SHORT_KEY, JSON.stringify(shortlist));
@@ -1276,10 +1298,12 @@
       <div class="legend-foot"><span>${banded ? "20-point bands" : "Fifths of your matches"}</span>
         <label title="Keep each shade's meaning fixed while you filter"><input type="checkbox" id="fixedScale" ${state.fixedScale ? "checked" : ""}>Fixed scale</label></div>
       <div class="legend-look">
-        <div class="pal" role="radiogroup" aria-label="Match colors">${Object.entries(PALETTES).map(([k, p]) =>
+        <div class="pal" role="radiogroup" aria-label="Match colors">${Object.entries(PALETTE_HEX).map(([k, p]) =>
           `<button type="button" role="radio" data-pal="${k}" aria-checked="${k === state.palette}" title="${p.label}" aria-label="${p.label}"
-            style="--c:${p[theme()][3]}"></button>`).join("")}</div>
-        <label class="fill-k">Fill <input type="range" id="fillK" min="0" max="100" step="5" value="${Math.round(state.fill * 100)}"
+            style="--g:linear-gradient(90deg, ${p[theme()].join(", ")})"></button>`).join("")}</div>
+        <div class="shade" role="radiogroup" aria-label="Shade the whole shape or just its edges">${[["fill", "Fill"], ["edge", "Edges"]].map(([k, t]) =>
+          `<button type="button" role="radio" data-shade="${k}" aria-checked="${k === state.shade}">${t}</button>`).join("")}</div>
+        <label class="fill-k">Strength <input type="range" id="fillK" min="0" max="100" step="5" value="${Math.round(state.fill * 100)}"
           aria-label="How strongly the colors cover the map" aria-valuetext="${Math.round(state.fill * 100)}%"></label>
       </div>`;
     if ($("legend")._html !== html) { $("legend").innerHTML = html; $("legend")._html = html; }
@@ -1312,11 +1336,12 @@
       update();
     });
     $("legend").addEventListener("click", (e) => {
-      const b = e.target.closest("[data-pal]");
-      if (!b || b.dataset.pal === state.palette) return;
-      state.palette = b.dataset.pal;
+      const b = e.target.closest("[data-pal]"), sh = e.target.closest("[data-shade]");
+      if (b && b.dataset.pal !== state.palette) state.palette = b.dataset.pal;
+      else if (sh && sh.dataset.shade !== state.shade) state.shade = sh.dataset.shade;
+      else return;
       paintMatchColors(); renderLegend(); renderLayersMenu(); persist();
-      $("legend").querySelector(`[data-pal="${state.palette}"]`)?.focus();
+      $("legend").querySelector(b ? `[data-pal="${state.palette}"]` : `[data-shade="${state.shade}"]`)?.focus();
     });
     // the fill slider repaints while it moves; the legend isn't rebuilt under the pointer
     $("legend").addEventListener("input", (e) => {
@@ -1831,7 +1856,7 @@
     let lastShape = -1;
     base.forEach((l, i) => { if (l.type !== "symbol") lastShape = i; });
     const firstLabel = base.slice(lastShape + 1).find((l) => l.type === "symbol")?.id;
-    if (!map.getSource("hoods")) map.addSource("hoods", { type: "geojson", data: GEO, promoteId: "id" });
+    if (!map.getSource("hoods")) map.addSource("hoods", { type: "geojson", data: GEO, promoteId: "id" });   // rings rewound at load (rewind)
     const dark = theme() === "dark";
     map.addLayer({ id: "fill", type: "fill", source: "hoods", paint: {
       "fill-color": "rgba(0,0,0,0)",
@@ -1839,6 +1864,9 @@
     } }, firstLabel);
     addContextUnder(firstLabel, dark);
     addHexLayers(firstLabel, dark);
+    // edges shading: a band inside each neighborhood's outline (see EDGE_SIDE)
+    map.addLayer({ id: "edge", type: "line", source: "hoods", layout: { "line-join": "round" }, paint: {
+      "line-color": "rgba(0,0,0,0)", "line-opacity": 0, "line-width": EDGE_W_HOOD, "line-offset": halfOff(EDGE_W_HOOD) } }, firstLabel);
     map.addLayer({ id: "line", type: "line", source: "hoods", paint: {
       "line-color": ["case", ["boolean", ["feature-state", "on"], false], dark ? "#1a1a19" : "#ffffff", dark ? "#55544f" : "#b4b2aa"],
       "line-width": ["case", ["boolean", ["feature-state", "on"], false], 0.9, 0.6],
@@ -1889,7 +1917,7 @@
     { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-count", "gyms-sel", "gyms-sel-ring"] },
     { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
     { id: "airports", label: "Airports", has: () => L.airports?.length, layers: ["airports", "airports-hover", "airport-codes"] },
-    { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-line"] },
+    { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-edge", "hex-line"] },
   ];
   let layerOn = Object.fromEntries(CONTEXT.map((c) => [c.id, true]));
   try { Object.assign(layerOn, JSON.parse(localStorage.getItem(LAYER_KEY) || "{}")); } catch (e) {}
@@ -2375,7 +2403,7 @@
     return { type: "FeatureCollection", features: rows.map((row, i) => {
       const h = evalHex(row, r), v = state.colorBy === "total" ? h.total : h.s[state.colorBy];
       const geometry = clip[i] ? { type: "MultiPolygon", coordinates: clip[i].map((poly) => poly.map(decodeRing)) } : { type: "Polygon", coordinates: [hexRing(row[0], row[1])] };
-      return { type: "Feature", id: i, geometry,
+      return { type: "Feature", id: i, geometry: rewind(geometry),
         properties: { i, v: v == null ? -1 : v, few: h.few } };
     }) };
   }
@@ -2385,8 +2413,8 @@
     hexShown = state.selected;
     map.setPaintProperty("hex-fill", "fill-color", hexFillColor());
   }
-  function hexFillColor() {
-    const c = ramp(), v = ["get", "v"];
+  function hexFillColor(solid = false) {
+    const c = solid ? solidRamp() : ramp(), v = ["get", "v"];
     return ["case", [">=", v, 0],
       ["step", v, c[0], thresholds[0], c[1], thresholds[1], c[2], thresholds[2], c[3], thresholds[3], c[4]],
       theme() === "dark" ? "rgba(240,239,236,0.10)" : "rgba(11,11,11,0.06)"];
@@ -2396,6 +2424,8 @@
     if (!map.getSource("hexes")) map.addSource("hexes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({ id: "hex-fill", type: "fill", source: "hexes", paint: { "fill-color": "rgba(0,0,0,0)",
       "fill-opacity": fillOpacity(["get", "few"]) } }, beforeId);
+    map.addLayer({ id: "hex-edge", type: "line", source: "hexes", layout: { "line-join": "miter" }, paint: {
+      "line-color": "rgba(0,0,0,0)", "line-opacity": 0, "line-width": EDGE_W_HEX, "line-offset": halfOff(EDGE_W_HEX) } }, beforeId);
     map.addLayer({ id: "hex-line", type: "line", source: "hexes", paint: {
       "line-color": ["case", ["boolean", ["feature-state", "hover"], false], dark ? "#f0efec" : "#0b0b0b", dark ? "#1a1a19" : "#ffffff"],
       "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2, 0.6],
@@ -2527,9 +2557,19 @@
     if (!map || !styleReady) return;
     if (map.getLayer("fill")) { map.setPaintProperty("fill", "fill-color", fillExpression()); map.setPaintProperty("fill", "fill-opacity", fillOpacity()); }
     if (map.getLayer("hex-fill")) { map.setPaintProperty("hex-fill", "fill-color", hexFillColor()); map.setPaintProperty("hex-fill", "fill-opacity", fillOpacity(["get", "few"])); }
+    const edge = state.shade === "edge";
+    if (map.getLayer("edge")) {
+      map.setPaintProperty("edge", "line-color", fillExpression(true));
+      // the open neighborhood's own band would sit on its hexes: they show the detail instead
+      map.setPaintProperty("edge", "line-opacity", edge ? ["case", ["boolean", ["feature-state", "sel"], false], HX ? 0 : state.fill, state.fill] : 0);
+    }
+    if (map.getLayer("hex-edge")) {
+      map.setPaintProperty("hex-edge", "line-color", hexFillColor(true));
+      map.setPaintProperty("hex-edge", "line-opacity", edge ? ["case", ["get", "few"], 0.4 * state.fill, state.fill] : 0);
+    }
   }
-  function fillExpression() {
-    const c = ramp();
+  function fillExpression(solid = false) {
+    const c = solid ? solidRamp() : ramp();
     const v = ["coalesce", ["feature-state", "v"], -1];
     return ["case",
       ["all", ["boolean", ["feature-state", "on"], false], [">=", v, 0]],
@@ -2713,6 +2753,7 @@
     `${RENT_BAND ? `, shown in $${fmtInt(RENT_BAND)} bands` : ""}.` +
     `${ROUTED ? " Commutes routed on MTA schedules." : ""}`;
   paintMatchColors();   // the layers menu swatch follows the palette before the map is up
+  for (const f of FEATS) f.geometry = rewind(f.geometry);   // so the edges band sits inside every outline
   buildFilters(); buildTabs(); bindLists(); buildPriorities(); buildColorBy(); bindDestMenu(); renderDestMenu(); renderLayersMenu(); bindLegend(); buildArea();
   update();
   initMap();

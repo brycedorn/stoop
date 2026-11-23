@@ -450,15 +450,23 @@ details.how li + li { margin-top: 4px; }
 .legend .ticks { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 4px; color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: 11px; }
 .legend .ticks span { text-align: center; }
 .legend .ends { display: flex; justify-content: space-between; margin-top: 2px; font-size: 10.5px; color: var(--ink-3); letter-spacing: .02em; }
-.legend-look { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hair); }
-.pal { display: flex; gap: 6px; }
+.legend-look { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hair); }
+/* palette chips: a rounded swatch of the palette's own five steps; the picked one gets a ring with a gap */
+.pal { display: flex; gap: 8px; }
 .pal button {
-  width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 0; cursor: pointer; background: var(--c);
-  box-shadow: 0 0 0 1.5px var(--raised), 0 0 0 2.5px var(--rule); transition: box-shadow .15s;
+  appearance: none; display: block; box-sizing: border-box; width: 30px; height: 18px; padding: 0; margin: 0; border: 0;
+  border-radius: 5px; cursor: pointer; background: var(--g); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
 }
-.pal button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--raised), 0 0 0 3.5px var(--ink); }
-.pal button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.fill-k { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-2); flex: 1; max-width: 150px; }
+.pal button[aria-checked="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pal button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shade { display: inline-flex; background: var(--wash); border-radius: var(--radius-sm); padding: 2px; }
+.shade button {
+  appearance: none; border: 0; background: none; height: 24px; padding: 0 9px; border-radius: 5px; font: inherit; font-size: 11.5px;
+  color: var(--ink-2); cursor: pointer;
+}
+.shade button[aria-checked="true"] { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.shade button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fill-k { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-2); flex: 1 1 100%; }
 .fill-k input[type=range] { margin: 0; height: 18px; flex: 1; min-width: 0; }
 .legend-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--ink-2); font-size: 11.5px; }
 .legend-foot label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; color: var(--ink); }
