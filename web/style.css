@@ -449,6 +449,17 @@ details.how li + li { margin-top: 4px; }
 .legend .swatches span:last-child { border-radius: 0 3px 3px 0; }
 .legend .ticks { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 4px; color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: 11px; }
 .legend .ticks span { text-align: center; }
+.legend .ends { display: flex; justify-content: space-between; margin-top: 2px; font-size: 10.5px; color: var(--ink-3); letter-spacing: .02em; }
+.legend-look { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hair); }
+.pal { display: flex; gap: 6px; }
+.pal button {
+  width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 0; cursor: pointer; background: var(--c);
+  box-shadow: 0 0 0 1.5px var(--raised), 0 0 0 2.5px var(--rule); transition: box-shadow .15s;
+}
+.pal button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--raised), 0 0 0 3.5px var(--ink); }
+.pal button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.fill-k { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-2); flex: 1; max-width: 150px; }
+.fill-k input[type=range] { margin: 0; height: 18px; flex: 1; min-width: 0; }
 .legend-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--ink-2); font-size: 11.5px; }
 .legend-foot label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; color: var(--ink); }
 .legend-foot input { accent-color: var(--accent); width: 14px; height: 14px; margin: 0; }
@@ -473,7 +484,7 @@ details.how li + li { margin-top: 4px; }
 .sw-out { width: 16px; height: 11px; border: 1px solid var(--rule); border-radius: 2px; }
 .sw-short { width: 16px; height: 11px; border: 1.5px dashed var(--ink); border-radius: 2px; background: var(--wash); }
 .sw-hexes.few { opacity: .35; }
-.sw-hexes { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: linear-gradient(90deg, #f19560 50%, #257c3a 50%); border-radius: 0; }
+.sw-hexes { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: linear-gradient(90deg, var(--ramp-lo, #c38ccd) 50%, var(--ramp-hi, #5e1f75) 50%); border-radius: 0; }
 .map-tools { position: absolute; top: 14px; left: 14px; right: 60px; z-index: 3; display: flex; gap: 8px; align-items: flex-start; pointer-events: none; }
 .map-tools > * { pointer-events: auto; }
 .map-layers { position: relative; }
