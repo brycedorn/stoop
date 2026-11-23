@@ -347,6 +347,9 @@ details.how li + li { margin-top: 4px; }
 /* ---------- partner mode ---------- */
 .people { margin: 0 2px 14px; display: grid; gap: 8px; }
 .people .ts { margin: 0; }
+.who-actions { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-left: -6px; }
+.ok-line { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--wash); color: var(--ink); font-size: 12.5px;
+  box-shadow: inset 3px 0 0 var(--mark); }
 .who { display: inline-flex; background: var(--wash); border-radius: var(--radius-sm); padding: 2px; justify-self: start; }
 .who button {
   border: 0; background: none; height: 30px; padding: 0 14px; border-radius: 5px; font: inherit; font-size: 13px;
@@ -761,3 +764,25 @@ details.more td:last-child { text-align: right; font-variant-numeric: tabular-nu
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- the ranking page a partner fills in (rank.html) ---------- */
+body.solo { display: block; height: auto; min-height: 100vh; overflow: auto; background: var(--page); }
+.solo-main { max-width: 560px; margin: 0 auto; padding: 28px 16px 64px; }
+.solo-head .logo { font-size: 22px; }
+.solo-head h1 { font-family: var(--display); font-size: 26px; line-height: 1.15; letter-spacing: -.02em; margin: 14px 0 8px; }
+.solo-lede { color: var(--ink-2); font-size: 14.5px; line-height: 1.5; margin: 0 0 8px; }
+.solo-step { margin-top: 24px; }
+.solo-step h2 { font-size: 13px; font-weight: 650; margin: 0 0 8px; letter-spacing: .01em; }
+.solo-step h2 small { color: var(--ink-3); font-weight: 500; }
+.solo-step .hint { margin: 0 0 10px; }
+.solo-step input[type="text"] { height: 40px; width: 100%; max-width: 320px; font: inherit; font-size: 15px; }
+.solo-row { display: flex; gap: 8px; }
+.solo-row input[type="text"] { flex: 1; max-width: none; }
+.solo .rank { margin: 0; }
+.solo .rk-name { white-space: normal; }
+.rk-help { display: block; font-size: 11.5px; font-weight: 450; color: var(--ink-3); line-height: 1.35; margin-top: 1px; }
+.rk.rk-off .rk-help { display: none; }
+.solo .rk { align-items: center; padding-top: 6px; padding-bottom: 6px; }
+.solo-send { display: grid; gap: 8px; justify-items: start; margin-top: 28px; }
+.solo-send .btn { min-height: 44px; padding: 0 18px; font-size: 15px; }
+.solo-send input { width: 100%; max-width: none !important; font-size: 12.5px !important; color: var(--ink-2); }

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>stoop · What matters to you</title>
+  <meta name="description" content="Rank what matters to you in a NYC neighborhood, then send it back as a link.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#fbf9f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1b1a17" media="(prefers-color-scheme: dark)">
+  <link rel="preload" href="fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script>/* apply a saved Light/Dark choice before the first paint (no flash) */
+    try { var t = localStorage.getItem("stoop.theme.v1"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body class="solo">
+  <main class="solo-main">
+    <header class="solo-head">
+      <span class="logo">stoop</span>
+      <h1>What matters to you in a neighborhood?</h1>
+      <p class="solo-lede" id="lede">Put what matters most at the top. When you're done, send the link back, and the map will rank NYC neighborhoods for both of you.</p>
+    </header>
+
+    <p class="warn-line" id="nodata" hidden>The neighborhood data didn't load. Try again in a moment.</p>
+
+    <section class="solo-step" aria-labelledby="s-name">
+      <h2 id="s-name">Your name</h2>
+      <input id="name" type="text" maxlength="20" autocomplete="given-name" placeholder="e.g. Sam">
+    </section>
+
+    <section class="solo-step" aria-labelledby="s-rank">
+      <h2 id="s-rank">Your priorities</h2>
+      <p class="hint">Drag to reorder, or focus the handle and use the arrow keys. Anything below the line doesn't count.</p>
+      <ol class="rank" id="rank" aria-label="Your priorities, most important first"></ol>
+      <p class="sr-only" id="rankLive" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="solo-step" aria-labelledby="s-commute">
+      <h2 id="s-commute">Where do you commute to? <small>optional</small></h2>
+      <form class="solo-row" id="addrForm">
+        <input id="addr" type="text" autocomplete="off" placeholder="An address or cross streets">
+        <button class="btn" type="submit">Find</button>
+      </form>
+      <p class="ts" id="addrMsg" role="status"></p>
+    </section>
+
+    <section class="solo-step solo-send" aria-labelledby="s-send">
+      <h2 id="s-send" class="sr-only">Send it back</h2>
+      <button class="btn primary" type="button" id="send">Send my priorities</button>
+      <p class="ts" id="sendMsg" role="status"></p>
+      <input id="sendLink" type="text" readonly hidden aria-label="Link with your priorities">
+    </section>
+  </main>
+
+  <script src="data/stoop.js"></script>
+  <script src="factors.js"></script>
+  <script src="rank.js"></script>
+</body>
+</html>
