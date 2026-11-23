@@ -108,3 +108,8 @@ def test_config_local_layers_on_top():
 def test_road_curve():
     from stoop.scoring import road_curve
     assert list(road_curve([0, 50, 225, 400, 900])) == pytest.approx([0, 0, 50, 100, 100])
+
+
+def test_dog_curve():
+    from stoop.scoring import dog_curve
+    assert list(dog_curve([0, 300, 900, 1500, 3000])) == pytest.approx([100, 100, 50, 0, 0])

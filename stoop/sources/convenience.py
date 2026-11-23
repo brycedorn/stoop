@@ -1,4 +1,4 @@
-"""Errands, gyms and Citi Bike."""
+"""Errands, gyms, dog runs and Citi Bike."""
 from __future__ import annotations
 
 import logging
@@ -71,6 +71,38 @@ def build_gyms(ctx) -> pd.DataFrame:
     out["gyms_walk"] = geo.to_nta(grid, geo.sum_within(cells, xy, GYM_RADIUS_M), "gyms_walk")
     log.info("gyms: %d full-size gyms (%s)", len(gyms), ", ".join(f"{b} {n}" for b, n in gyms["brand"].value_counts().head(6).items()))
     return out
+DOG_RADIUS_M = 1000   # "how many dog runs within a walk"
+
+
+def dog_runs(ctx, refresh: bool = False) -> pd.DataFrame:
+    """NYC Parks dog runs: lon, lat (a point inside each run), name."""
+    import json
+    path = fetch.socrata_geojson(ctx.src["nyc_open_data"], ctx.src["dog_runs"], ctx.raw, refresh)
+    rows = []
+    for f in json.loads(path.read_text(encoding="utf-8")).get("features", []):
+        geom, p = f.get("geometry") or {}, f.get("properties") or {}
+        if p.get("featurestatus") not in (None, "Active"):
+            continue
+        rings = geom.get("coordinates") or []
+        ring = rings[0][0] if geom.get("type") == "MultiPolygon" else rings[0] if rings else []
+        if not ring:
+            continue
+        rows.append({"lon": float(np.mean([c[0] for c in ring])), "lat": float(np.mean([c[1] for c in ring])),
+                     "name": str(p.get("name") or "Dog run")})
+    return pd.DataFrame(rows, columns=["lon", "lat", "name"])
+
+
+def build_dogs(ctx) -> pd.DataFrame:
+    runs = dog_runs(ctx, ctx.wants_refresh("dogs"))
+    cells = geo.cell_xy(ctx.grid)
+    xy = geo.df_xy(runs, lon="lon", lat="lat")
+    out = pd.DataFrame(index=ctx.ntas.index)
+    out["nearest_dog_run_m"] = geo.to_nta(ctx.grid, geo.nearest_dist(cells, xy), "nearest_dog_run_m")
+    out["dog_runs_walk"] = geo.to_nta(ctx.grid, geo.sum_within(cells, xy, DOG_RADIUS_M), "dog_runs_walk")
+    log.info("dogs: %d dog runs", len(runs))
+    return out
+
+
 ERRAND_DECAY_M = 400   # nearest at 0 m -> 1.0, at 400 m -> 0.37
 
 

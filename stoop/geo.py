@@ -54,6 +54,7 @@ def load_ntas(ctx: Context):
 ACS_VARS = {
     "B01003_001E": "pop",
     "B25003_003E": "renter_units",
+    "B25004_002E": "vacant_for_rent",   # empty and on the market for rent
     "B25064_001E": "rent_all",
     "B25031_002E": "rent_0br",
     "B25031_003E": "rent_1br",
@@ -64,8 +65,12 @@ ACS_VARS = {
 
 def load_acs(ctx: Context) -> pd.DataFrame:
     cache = ctx.interim / "acs_tracts.parquet"
-    if cache.exists() and not ctx.wants_refresh("neighborhoods"):
-        return pd.read_parquet(cache)
+    refresh = ctx.wants_refresh("neighborhoods")
+    if cache.exists() and not refresh:
+        cached = pd.read_parquet(cache)
+        if set(ACS_VARS.values()) <= set(cached.columns):
+            return cached
+        refresh = True   # a variable was added since the cache was written
     c = ctx.cfg["census"]
     if not c.get("api_key"):
         log.warning("no Census API key set; requests may be rate-limited (set CENSUS_API_KEY)")
@@ -76,7 +81,7 @@ def load_acs(ctx: Context) -> pd.DataFrame:
         if c.get("api_key"):
             params["key"] = c["api_key"]
         data = fetch.get_json(f"https://api.census.gov/data/{year}/acs/acs5", ctx.raw,
-                              f"acs{year}_{county}", ctx.wants_refresh("neighborhoods"), params)
+                              f"acs{year}_{county}", refresh, params)
         frames.append(pd.DataFrame(data[1:], columns=data[0]))
     df = pd.concat(frames, ignore_index=True)
     df["geoid"] = df["state"] + df["county"] + df["tract"]

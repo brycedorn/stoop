@@ -6,7 +6,7 @@ neighborhoods on what matters to you, and you tune the weights live on a map.
 | Factor | Source |
 |---|---|
 | Running | OpenStreetMap paths, NYC Parks, your own GPS runs |
-| 5K routes | Walk to the nearest car-free route long enough for a 5K: park loops, greenways, waterfront paths (OpenStreetMap) |
+| Dog runs | Walk to the nearest NYC Parks dog run (NYC Open Data) |
 | Airports | Routed transit time to JFK, LaGuardia, Newark |
 | Your bars & restaurants | Shown on the map (geocoded with OSM Nominatim); not scored |
 | Commute | r5py routing on MTA GTFS + OSM (estimated fallback) |

@@ -38,12 +38,20 @@ def download_listing_rents(url: str, dest: Path, refresh: bool = False) -> Path:
     import zipfile
     from .. import fetch
     dest.mkdir(parents=True, exist_ok=True)
-    for b in [*LISTING_BEDROOM_CODES.values(), "All"]:
-        z = fetch.download(url.format(b=b), dest / f"medianAskingRent_{b}.zip", refresh)
+    def unzip(z):
         with zipfile.ZipFile(z) as zf:
             for member in zf.namelist():   # extract CSVs only, flattened (never trust archive paths)
                 if member.lower().endswith(".csv"):
                     (dest / Path(member).name).write_bytes(zf.read(member))
+    for b in [*LISTING_BEDROOM_CODES.values(), "All"]:
+        unzip(fetch.download(url.format(b=b), dest / f"medianAskingRent_{b}.zip", refresh))
+    # the same source's count of rentals on the market, when it publishes one next to the rents
+    inv_url = url.format(b="All").replace("medianAskingRent", "rentalInventory")
+    if inv_url != url.format(b="All"):
+        try:
+            unzip(fetch.download(inv_url, dest / "rentalInventory_All.zip", refresh))
+        except Exception as e:
+            log.info("no listing inventory download (%s)", e)
     return dest
 
 
@@ -127,7 +135,7 @@ def mean_rent(listing_area, listing_rent: pd.Series) -> float:
 def read_listing_rents(folder: Path, bedrooms: int) -> pd.DataFrame | None:
     """Latest median asking rent per listing area from the CSVs."""
     files = list(Path(folder).glob("*.csv")) if Path(folder).exists() else []
-    rent_files = [f for f in files if "rent" in f.name.lower()]
+    rent_files = [f for f in files if "rent" in f.name.lower() and "inventory" not in f.name.lower()]
     pick = None
     for f in rent_files:
         n = f.name.lower().replace("_", "").replace("-", "")
@@ -149,6 +157,46 @@ def read_listing_rents(folder: Path, bedrooms: int) -> pd.DataFrame | None:
     }).dropna(subset=["listing_rent"])
     out = out[out["area_type"].astype(str).str.lower() == "neighborhood"]
     log.info("listing rents: %s, %d areas, latest month %s", pick.name, len(out), sorted(month_cols)[-1])
+    return out
+
+
+def read_listing_inventory(folder: Path) -> tuple[pd.DataFrame, str] | None:
+    """(rentals listed per listing area in the latest month, that month), from an inventory CSV in the folder."""
+    files = [f for f in Path(folder).glob("*.csv") if "inventory" in f.name.lower()] if Path(folder).exists() else []
+    if not files:
+        return None
+    df = pd.read_csv(files[0])
+    month_cols = sorted(c for c in df.columns if re.match(r"^\d{4}-\d{2}", str(c)))
+    if not month_cols:
+        return None
+    out = pd.DataFrame({"area": df["areaName"], "borough": df["Borough"], "area_type": df.get("areaType", "neighborhood"),
+                        "listings": pd.to_numeric(df[month_cols[-1]], errors="coerce")}).dropna(subset=["listings"])
+    out = out[out["area_type"].astype(str).str.lower() == "neighborhood"]
+    return out, month_cols[-1]
+
+
+def listings_now(ctx, listing_dir: Path | None) -> pd.DataFrame:
+    """listings_now (rentals on the market in the latest month) and listings_area per NTA. Local only: the public
+    build drops both."""
+    got = read_listing_inventory(listing_dir) if listing_dir else None
+    out = pd.DataFrame(index=ctx.ntas.index)
+    if got is None:
+        return out
+    inv, month = got
+    m = match_listing_areas(ctx.ntas[["name", "borough"]], inv)
+    xw_path = ctx.inputs / "rent_crosswalk.csv"
+    if xw_path.exists():
+        xw = pd.read_csv(xw_path).dropna().rename(columns={"se_area": "listing_area"}).set_index("nta2020")["listing_area"]
+        m.loc[m.index.intersection(xw.index), "listing_area"] = xw
+    count = inv.drop_duplicates("area").set_index("area")["listings"]
+    def total(a):
+        if not isinstance(a, str) or not a:
+            return np.nan
+        vals = count.reindex([x.strip() for x in a.split(AREA_SEP.strip())]).dropna()
+        return float(vals.sum()) if len(vals) else np.nan
+    out["listings_now"] = m["listing_area"].map(total)
+    out["listings_area"] = m["listing_area"].where(out["listings_now"].notna())
+    log.info("listing inventory %s: %d NTAs matched", month, int(out["listings_now"].notna().sum()))
     return out
 
 
@@ -221,4 +269,4 @@ def build(ctx) -> pd.DataFrame:
             out["rent_acs"] = base[f"acs_rent_{b}br"].fillna(base["acs_rent_all"])
             if m is not None:
                 m.join(ctx.ntas[["name", "borough"]]).to_csv(ctx.interim / "rent_matches.csv")
-    return out
+    return out.join(listings_now(ctx, listing_dir))

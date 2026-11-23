@@ -14,6 +14,7 @@ STEPS = {
     "safety": safety.build_safety,
     "quiet": safety.build_quiet,
     "errands": convenience.build_errands,
+    "dogs": convenience.build_dogs,     # NYC Parks dog runs
     "gyms": convenience.build_gyms,     # full-size gyms (chains, YMCAs, rec centers) from the errands OSM cache
     "citibike": convenience.build_citibike,
     "air_quality": air_quality.build,   # PM2.5 / NO2 by district (EHDP) + distance from highways (OSM)

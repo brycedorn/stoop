@@ -134,6 +134,15 @@ def gyms(ctx) -> list:
     return out
 
 
+def dogs(ctx) -> list:
+    """NYC Parks dog runs: [lon, lat, name]."""
+    from .sources.convenience import dog_runs
+    d = dog_runs(ctx)
+    out = [[_r(lon), _r(lat), n] for lon, lat, n in zip(d["lon"], d["lat"], d["name"])]
+    log.info("layers: %d dog runs", len(out))
+    return out
+
+
 def subway(ctx) -> dict:
     """Subway lines from the MTA GTFS (official route colors) + stations with their routes."""
     from shapely.geometry import LineString, mapping
@@ -297,7 +306,7 @@ def _route_key(r: str):
     return (m.group(1), int(m.group(2) or 0), m.group(3)) if m else (r, 0, "")
 
 
-BUILDERS = {"parks": parks, "places": places, "grocery": grocery, "gyms": gyms, "airports": airports,
+BUILDERS = {"parks": parks, "places": places, "grocery": grocery, "gyms": gyms, "airports": airports, "dogs": dogs,
             "subway": subway, "bus": bus_stops,
             "bus_routes": bus_routes}
 
@@ -352,7 +361,7 @@ def tag_boroughs(ctx, out: dict) -> dict:
     def rows(lst):
         b = of([r[0] for r in lst], [r[1] for r in lst])
         return [(list(r) + [""] * (4 - len(r)))[:4] + [x] for r, x in zip(lst, b)]
-    for key in ["grocery", "gyms", "places", "bus"]:
+    for key in ["grocery", "gyms", "dogs", "places", "bus"]:
         if out.get(key):
             out[key] = rows(out[key])
     if (out.get("subway") or {}).get("stations"):

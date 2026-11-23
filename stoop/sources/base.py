@@ -19,6 +19,10 @@ def build(ctx) -> pd.DataFrame:
     out = pd.DataFrame(index=ntas.index)
     out["pop"] = g["pop"].sum().reindex(ntas.index).fillna(0)
     out["renter_units"] = g["renter_units"].sum().reindex(ntas.index)
+    # Rental supply (Census, 5-year): every rental home, and the share that's empty and for rent
+    out["vacant_for_rent"] = g["vacant_for_rent"].sum(min_count=1).reindex(ntas.index)
+    out["rental_homes"] = out["renter_units"] + out["vacant_for_rent"]
+    out["rental_vacancy"] = out["vacant_for_rent"] / out["rental_homes"].replace(0, np.nan)
     out["pop_density_km2"] = out["pop"] / ntas["land_km2"].replace(0, np.nan)
 
     # ACS median gross rent by bedroom count, averaged over tracts weighted by renter units.

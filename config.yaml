@@ -31,7 +31,7 @@ grid_cell_m: 200          # square cell size, only used with grid: square
 # Every factor is scored 0-100. These are default slider weights; the map
 # lets you change them live.
 default_weights:
-  running: 15
+  running: 25               # paths, 5K routes, big parks, your runs
   commute: 20
   rent: 20
   safety: 10
@@ -44,7 +44,7 @@ default_weights:
   citibike: 3
   size: 8
   familiarity: 0          # needs liked_neighborhoods
-  run5k: 10               # walk to a car-free 5K route (OpenStreetMap park loops, greenways)
+  dogs: 0                 # walk to a NYC Parks dog run; raise it if you have a dog
 
 census:
   # Free key: https://api.census.gov/data/key_signup.html
@@ -62,6 +62,7 @@ sources:
   nypd_complaints_historic: qgea-i56i
   complaints_311: erm2-nwe9       # 311 Service Requests (noise)
   parks: enfh-gkve                # Parks Properties
+  dog_runs: hxx3-bwgv             # NYC Parks dog runs
   street_trees: uvpi-gqnh         # 2015 Street Tree Census
   subway_stations: 39hk-dx4f      # MTA Subway Stations (data.ny.gov)
   citibike_stations: https://gbfs.citibikenyc.com/gbfs/en/station_information.json

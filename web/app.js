@@ -15,6 +15,12 @@
   const BOROUGHS = [...new Set(FEATS.map((f) => f.properties.borough))].sort();
   const RESIDENTIAL = FEATS.filter((f) => f.properties.residential).length;
   const STORE_KEY = "stoop.state.v2";
+  // Factors folded into another: an old saved setting or link keeps its weight under the new name
+  const MERGED_INTO = { run5k: "running" };
+  const takeMerged = (from, to) => {
+    for (const [old, k] of Object.entries(MERGED_INTO))
+      if (typeof from[old] === "number" && FACTORS.includes(k)) to[k] = Math.max(to[k] || 0, from[old]);
+  };
   const SHORT_KEY = "stoop.shortlist.v1";
   const MOBILE = () => matchMedia("(max-width: 860px)").matches;
   const TOUCH = () => matchMedia("(hover: none)").matches;   // no hover: taps show map details
@@ -26,7 +32,7 @@
   const GROUPS = [
     { id: "cost", title: "Cost & space", keys: ["rent", "size", "space"], color: { light: "#2a78d6", dark: "#3987e5" } },
     { id: "move", title: "Getting around", keys: ["commute", "airports", "citibike", "errands"], color: { light: "#eb6834", dark: "#d95926" } },
-    { id: "life", title: "Lifestyle & outdoors", keys: ["running", "run5k", "gym", "green", "favorites", "familiarity"], color: { light: "#1baf7a", dark: "#199e70" } },
+    { id: "life", title: "Lifestyle & outdoors", keys: ["running", "gym", "dogs", "green", "favorites", "familiarity"], color: { light: "#1baf7a", dark: "#199e70" } },
     { id: "env", title: "Safety & environment", keys: ["safety", "quiet", "air"], color: { light: "#6f6d68", dark: "#9a988f" } },
   ];
   const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => g.keys.map((k) => [k, g])));
@@ -35,6 +41,7 @@
   const groupColor = (k) => groupOf(k).color[theme()];
   // 24px stroke icons, one per factor (shape carries identity alongside the group color)
   const ICON_PATHS = {
+    dogs: "M4.4 10.5a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M7.9 6.3a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M12.9 6.3a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M16.4 10.5a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M12 12.5c-2.5 0-5 3-5 5.2 0 1.5 1.2 2.3 2.6 2.3 1 0 1.6-.5 2.4-.5s1.4.5 2.4.5c1.4 0 2.6-.8 2.6-2.3 0-2.2-2.5-5.2-5-5.2z",
     rent: "M12 3v18M16.5 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7",
     size: "M4 4h16v16H4zM4 12h7v8M15 4v5",
     space: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 20c0-3 2.4-5 5.5-5s5.5 2 5.5 5M13.5 15.3c.9-.2 1.9-.3 3-.3 3.1 0 5 2 5 5",
@@ -52,13 +59,12 @@
     air: "M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8",
     quiet: "M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z",
   };
-  ICON_PATHS.run5k = "M4 19c0-3.5 3-4 5.5-4S15 14 15 11s-3-3.5-3-3.5M15 3.5v8M15 3.5h5l-1.5 2.25L20 8h-5";
   const icon = (k) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON_PATHS[k] || "M12 12h.01"}"/></svg>`;
   // A tag: tinted chip + colored icon (identity) + ink text (dataviz: text never wears the series color)
   const tag = (k, { weak = false, text = null } = {}) =>
     `<span class="tag${weak ? " weak" : ""}" style="--tc:${groupColor(k)}" title="${esc(META.factors[k]?.label || k)}">${icon(k)}${weak ? "low " : ""}${esc(text ?? short(k))}</span>`;
   const SHORT = {
-    favorites: "Your places", gym: "Gyms", airports: "Airports", run5k: "5K routes", familiarity: "Familiar area", size: "Apartment size",
+    favorites: "Your places", gym: "Gyms", dogs: "Dog runs", airports: "Airports", familiarity: "Familiar area", size: "Apartment size",
     space: "Breathing room", citibike: "Citi Bike", errands: "Errands", green: "Green space",
   };
   const short = (k) => SHORT[k] || META.factors[k].label;
@@ -87,7 +93,7 @@
   const PRESETS = {
     "My defaults": null,
     Balanced: Object.fromEntries(AVAILABLE.map((k) => [k, k === "space" ? 0 : 10])),
-    Runner: { running: 35, run5k: 25, green: 10, commute: 15, rent: 10, gym: 5 },
+    Runner: { running: 60, green: 10, commute: 15, rent: 10, gym: 5 },
     "Budget first": { rent: 40, commute: 25, size: 10, safety: 10, errands: 10, running: 5 },
     Quiet: { quiet: 30, green: 20, safety: 15, air: 15, space: 10, rent: 5, commute: 5 },
     Familiar: { familiarity: 30, commute: 25, rent: 20, running: 15, green: 10 },
@@ -106,6 +112,21 @@
   const state = { ...defaults(), area: { ...AREA_DEFAULT }, colorBy: "total", sort: "match", fixedScale: false, selected: null, hover: null, query: "", tab: "matches", addingDest: false };
   const SORTS = ["match", "rent", "commute", "size"];
   state.boroughs = new Set(state.boroughs);
+  // Partner mode: a second set of priorities. Neighborhoods rank by the lower of the two matches ("best for both"),
+  // so a place one of you would dislike never tops the list. Must-haves (budget, bedrooms, boroughs, max commute)
+  // are shared; the partner can commute to a pin of their own. state.weights is whoever is being edited.
+  state.people = [{ name: "You", weights: state.weights }];
+  state.editing = 0;
+  Object.defineProperty(state, "weights", { get: () => state.people[state.editing].weights,
+    set: (w) => { state.people[state.editing].weights = w; }, enumerable: true, configurable: true });
+  const partner = () => state.people[1] || null;
+  const newPartner = (name = "Partner") => ({ name, weights: { ...META.weights }, pin: null });
+  const cleanName = (s, fallback) => String(s || "").replace(/[^\p{L}\p{N} .'-]/gu, "").trim().slice(0, 20) || fallback;
+  const readWeights = (from) => {
+    const w = Object.fromEntries(FACTORS.map((k) => [k, typeof from?.[k] === "number" ? from[k] : META.weights[k] || 0]));
+    if (from) takeMerged(from, w);
+    return w;
+  };
   let shortlist = [];
   // Commute destinations (draggable pins). Start from config.yaml; edits live in this browser.
   // Commute is scored to ONE place (config you.commute_to); the others are switched to from the "Commute to" menu.
@@ -120,6 +141,10 @@
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (s) {
       for (const k of FACTORS) if (typeof s.weights?.[k] === "number") state.weights[k] = s.weights[k];
+      if (s.weights) takeMerged(s.weights, state.weights);
+      if (s.youName) state.people[0].name = cleanName(s.youName, "You");
+      if (s.partner?.weights) state.people[1] = { name: cleanName(s.partner.name, "Partner"), weights: readWeights(s.partner.weights),
+        pin: Number.isFinite(s.partner.pin?.lat) ? { lat: s.partner.pin.lat, lon: s.partner.pin.lon } : null };
       if (s.budget > 0) state.budget = s.budget;
       if (["0", "1", "2", "3"].includes(s.bedrooms)) state.bedrooms = s.bedrooms;
       if (s.maxCommute > 0) state.maxCommute = s.maxCommute;
@@ -161,12 +186,43 @@
   function readLink() {
     const h = new URLSearchParams(location.hash.slice(1));
     if (h.has("w")) {
-      const w = Object.fromEntries(FACTORS.map((k) => [k, 0]));
+      const w = Object.fromEntries(FACTORS.map((k) => [k, 0])), old = {};
       for (const part of h.get("w").split(",")) {
         const [k, v] = part.split(":");
-        if (FACTORS.includes(k) && Number.isFinite(+v) && +v >= 0) w[k] = Math.min(100, Math.round(+v));
+        if (!(Number.isFinite(+v) && +v >= 0)) continue;
+        if (FACTORS.includes(k)) w[k] = Math.min(100, Math.round(+v));
+        else if (k in MERGED_INTO) old[k] = Math.min(100, Math.round(+v));
       }
-      state.weights = w;
+      takeMerged(old, w);
+      state.people[0].weights = w;
+      // a link carries one ranking or a couple's: whatever it holds replaces what this browser had
+      state.people.length = 1;
+      if (h.has("pw")) {
+        const pw = Object.fromEntries(FACTORS.map((k) => [k, 0])), pold = {};
+        for (const part of h.get("pw").split(",")) {
+          const [k, v] = part.split(":");
+          if (!(Number.isFinite(+v) && +v >= 0)) continue;
+          if (FACTORS.includes(k)) pw[k] = Math.min(100, Math.round(+v));
+          else if (k in MERGED_INTO) pold[k] = Math.min(100, Math.round(+v));
+        }
+        takeMerged(pold, pw);
+        state.people[1] = { name: cleanName(h.get("pn"), "Partner"), weights: pw, pin: null };
+      }
+      if (h.has("yn")) state.people[0].name = cleanName(h.get("yn"), "You");
+    }
+    // Commute pins travel only in the link made for a partner ("lat,lon,name|…"; yd = yours, pd = theirs)
+    if (h.has("pins")) {
+      const pins = h.get("pins").split("|").map((x) => {
+        const [lat, lon, ...name] = x.split(",");
+        return { name: cleanName(name.join(","), "Pin"), lat: +(+lat).toFixed(5), lon: +(+lon).toFixed(5), weight: 1, on: false };
+      }).filter((d) => Number.isFinite(d.lat) && Number.isFinite(d.lon) && Math.abs(d.lat - 40.7) < 1 && Math.abs(d.lon + 74) < 1);
+      if (pins.length) {
+        dests = pins;
+        const yd = +h.get("yd");
+        setActive(Number.isInteger(yd) && yd >= 0 && yd < pins.length ? yd : 0);
+        const pd = +h.get("pd");
+        if (partner() && Number.isInteger(pd) && pins[pd]) partner().pin = { lat: pins[pd].lat, lon: pins[pd].lon };
+      }
     }
     if (+h.get("rent") > 0) state.budget = Math.round(+h.get("rent"));
     if (["0", "1", "2", "3"].includes(h.get("bd"))) state.bedrooms = h.get("bd");
@@ -181,8 +237,12 @@
   }
   try { readLink(); } catch (e) { /* a mangled link: keep what we have */ }
   function linkHash() {
-    const w = FACTORS.filter((k) => (state.weights[k] || 0) > 0).map((k) => `${k}:${Math.round(state.weights[k])}`).join(",");
-    const p = new URLSearchParams({ w, rent: state.budget, bd: state.bedrooms, min: state.maxCommute });
+    const enc = (ws) => FACTORS.filter((k) => (ws[k] || 0) > 0).map((k) => `${k}:${Math.round(ws[k])}`).join(",");
+    const p = new URLSearchParams({ w: enc(state.people[0].weights), rent: state.budget, bd: state.bedrooms, min: state.maxCommute });
+    if (partner()) {
+      p.set("pw", enc(partner().weights));
+      p.set("yn", state.people[0].name); p.set("pn", partner().name);
+    }
     if (state.showOver) p.set("over", "1");
     if (state.boroughs.size < BOROUGHS.length) p.set("b", [...state.boroughs].map((b) => BORO_CODE[b] || "").join(""));
     if (state.colorBy !== "total") p.set("color", state.colorBy);
@@ -201,7 +261,7 @@
     writeLink();
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify({
-        weights: state.weights, budget: state.budget, bedrooms: state.bedrooms, maxCommute: state.maxCommute,
+        weights: state.people[0].weights, youName: state.people[0].name, partner: partner(), budget: state.budget, bedrooms: state.bedrooms, maxCommute: state.maxCommute,
         showOver: state.showOver, boroughs: [...state.boroughs], colorBy: state.colorBy, sort: state.sort, fixedScale: state.fixedScale, area: state.area,
         excludeSeen: JSON.stringify(META.exclude_boroughs || []),
       }));
@@ -279,6 +339,32 @@
     }
   }
   const commuteOf = (p) => (liveCommute ? liveCommute.get(p.id) : p.metrics.commute_min);
+  // The partner's commute: to their own pin when they picked one, else the same as yours
+  const partnerDest = () => {
+    const q = partner();
+    return q?.pin ? dests.find((d) => d.lat === q.pin.lat && d.lon === q.pin.lon) || null : null;
+  };
+  let partnerCommute = null;   // Map id -> minutes, or null = same as yours
+  let partnerEstimated = false;
+  function computePartnerCommutes() {
+    partnerCommute = null; partnerEstimated = false;
+    const d = partnerDest();
+    if (!d || d.on) return;
+    const t = { cfg: configIndex(d), t: STATIONS.length ? target(d) : null };
+    partnerCommute = new Map();
+    for (const f of FEATS) {
+      const p = f.properties, h = HOME.get(p.id);
+      let m = t.cfg >= 0 ? p.commutes?.[t.cfg] : null;
+      if (m == null) {
+        if (!t.t || !h.st) continue;
+        partnerEstimated = true;
+        const walkOnly = (dist(h.xy, t.t.xy) * CM.detour) / CM.walk_m_per_min;
+        m = Math.max(1, Math.min(estimateTo(h, t.t) + (OFFSET.get(p.id) || 0), walkOnly));
+      }
+      partnerCommute.set(p.id, m);
+    }
+  }
+  const partnerCommuteOf = (p) => (partnerCommute ? partnerCommute.get(p.id) : commuteOf(p));
   const commuteCurve = (m) => Math.min(Math.max((CM.curve_bad - m) / (CM.curve_bad - CM.curve_good), 0), 1) * 100;
   // station-distance percentile among residential areas (lower distance = better), like scoring.percentile
   const STATION_PCT = (() => {
@@ -293,8 +379,8 @@
     }
     return out;
   })();
-  function liveCommuteScore(p) {
-    const parts = [[commuteOf(p) == null ? null : commuteCurve(commuteOf(p)), CM.weights.commute_min],
+  function liveCommuteScore(p, mins = commuteOf(p)) {
+    const parts = [[mins == null ? null : commuteCurve(mins), CM.weights.commute_min],
       [STATION_PCT.get(p.id) ?? null, CM.weights.station_dist_m]].filter(([s]) => s != null);
     const w = parts.reduce((a, [, x]) => a + x, 0);
     return w ? parts.reduce((a, [s, x]) => a + s * x, 0) / w : null;
@@ -315,21 +401,30 @@
   const commuteIsEstimate = (p) => (liveCommute ? liveEstimated : p.metrics.commute_method === "estimate");
   const bedLabel = (b) => ({ 0: "studio", 3: "3+ bed" }[b] || `${b}-bed`);
 
-  function evaluate(p) {
-    const s = { ...p.scores };
-    const rent = rentOf(p), mins = commuteOf(p);
-    if (rent != null) s.rent = rentCurve(rent, state.budget);
-    if (liveCommute) s.commute = liveCommuteScore(p);
+  // Weighted match for one person's weights: total and each factor's contribution
+  function weighted(s, weights) {
     let num = 0, den = 0;
     for (const k of FACTORS) {
-      const w = state.weights[k] || 0;
+      const w = weights[k] || 0;
       if (w > 0 && s[k] != null) { num += s[k] * w; den += w; }
     }
     const total = den ? num / den : null;
     // contribution = share of the weight actually used for this place x factor score
-    const parts = FACTORS.filter((k) => (state.weights[k] || 0) > 0 && s[k] != null)
-      .map((k) => ({ k, score: s[k], share: state.weights[k] / den, pts: (s[k] * state.weights[k]) / den }))
+    const parts = FACTORS.filter((k) => (weights[k] || 0) > 0 && s[k] != null)
+      .map((k) => ({ k, score: s[k], share: weights[k] / den, pts: (s[k] * weights[k]) / den }))
       .sort((a, b) => b.pts - a.pts);
+    return { total, parts };
+  }
+  const bothTotal = (ts) => (ts.length < 2 ? ts[0] : ts.some((t) => t == null) ? null : Math.min(...ts));
+  function evaluate(p) {
+    const base = { ...p.scores };
+    const rent = rentOf(p), mins = commuteOf(p);
+    if (rent != null) base.rent = rentCurve(rent, state.budget);
+    if (liveCommute) base.commute = liveCommuteScore(p);
+    const ss = state.people.map((q, i) => (i === 1 && partnerCommute ? { ...base, commute: liveCommuteScore(p, partnerCommute.get(p.id)) } : base));
+    const per = state.people.map((q, i) => weighted(ss[i], q.weights));
+    const me = Math.min(state.editing, per.length - 1);
+    const s = ss[me], parts = per[me].parts, totals = per.map((x) => x.total), total = bothTotal(totals);
     const fails = [];
     if (!state.showOver && rent != null && rent > state.budget) fails.push({ k: "rent", over: rent - state.budget,
       text: `Over your budget: ${fmtRent(rent)} for a ${bedLabel(state.bedrooms)}`,
@@ -337,6 +432,10 @@
     if (mins != null && mins > state.maxCommute) fails.push({ k: "commute", over: mins - state.maxCommute,
       text: `Commute ${commuteIsEstimate(p) ? "~" : ""}${Math.round(mins)} min, over your ${state.maxCommute} min limit`,
       short: `${Math.max(1, Math.round(mins - state.maxCommute))} min over your commute limit` });
+    const pm = partnerCommute ? partnerCommuteOf(p) : null;
+    if (pm != null && pm > state.maxCommute) fails.push({ k: "commute", over: pm - state.maxCommute,
+      text: `${partner().name}'s commute ${partnerEstimated ? "~" : ""}${Math.round(pm)} min, over the ${state.maxCommute} min limit`,
+      short: `${partner().name}: ${Math.max(1, Math.round(pm - state.maxCommute))} min over the commute limit` });
     let reason = null, near = null;
     if (!p.residential) reason = "Not a residential area (park, airport, etc.)";
     else if (!state.boroughs.has(p.borough)) reason = `${p.borough} is filtered out`;
@@ -347,7 +446,7 @@
       if (total != null && fails.every((f) => (f.k === "rent" ? f.over <= state.budget * NEAR_RENT : f.over <= NEAR_MIN)))
         near = fails.map((f) => f.short).join(" · ");
     }
-    return { s, total, parts, visible: !reason, reason, near };
+    return { s, ss, total, totals, parts, visible: !reason, reason, near };
   }
 
   // Area filter: straight-line distance from the area center to the neighborhood's label point (inside it,
@@ -385,6 +484,7 @@
   let results = [], byId = new Map(), thresholds = [20, 40, 60, 80];
   function recompute() {
     computeCommutes();
+    computePartnerCommutes();
     results = FEATS.map((f) => ({ f, id: f.properties.id, ...evaluate(f.properties) }));
     results.sort((a, b) => (b.total ?? -1) - (a.total ?? -1));
     let rank = 0;
@@ -434,6 +534,7 @@
   const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linejoin="round" d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>';
   const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>';
   const CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  const PLUS = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
   const ALERT = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>';
 
   // ---------- top bar ----------
@@ -637,7 +738,7 @@
       <button class="row" type="button" data-select="${esc(r.id)}">
         <span class="rank"></span>
         <span class="main"><span class="name">${esc(p.name)}</span><span class="facts">${facts}</span>${why ? `<span class="why">${why}</span>` : ""}</span>
-        <span class="score"><b></b></span>
+        <span class="score"><b></b><small class="both"></small></span>
       </button>
       <button class="icon-btn star" type="button" data-star="${esc(r.id)}" aria-pressed="${starred}" aria-label="${starred ? "Remove from" : "Add to"} shortlist: ${esc(p.name)}">${STAR}</button>
     </li>`;
@@ -645,8 +746,11 @@
       li.classList.toggle("sel", r.id === state.selected);
       li.classList.toggle("off", off || near);
       li.classList.toggle("near", near);
-      const btn = li.firstElementChild, rank = btn.firstElementChild, score = btn.lastElementChild.firstChild;
-      const label = `${p.name}, match ${total ?? "no data"}${r.rank ? ", rank " + r.rank : ""}`;
+      const btn = li.firstElementChild, rank = btn.firstElementChild, score = btn.lastElementChild.firstChild, both = btn.lastElementChild.lastChild;
+      const two = state.people.length > 1 ? r.totals.map((t) => (t == null ? "—" : Math.round(t))) : null;
+      const label = `${p.name}, match ${total ?? "no data"}${two ? ` (${state.people.map((q, i) => `${q.name} ${two[i]}`).join(", ")})` : ""}${r.rank ? ", rank " + r.rank : ""}`;
+      const bothText = two ? two.join(" · ") : "";
+      if (both.textContent !== bothText) both.textContent = bothText;
       if (btn.getAttribute("aria-label") !== label) btn.setAttribute("aria-label", label);
       if (rank.textContent !== String(r.rank ?? "")) rank.textContent = r.rank ?? "";
       if (score.textContent !== String(total ?? "—")) score.textContent = total ?? "—";
@@ -844,7 +948,44 @@
 
   // ---------- priorities ----------
   function weightsEqual(a, b) { return FACTORS.every((k) => (a[k] || 0) === (b?.[k] || 0)); }
+  function renderPeople() {
+    const q = partner(), box = $("people");
+    if (!q) {
+      box.innerHTML = `<button class="btn ghost sm" type="button" id="addPartner">${PLUS}Add a partner's priorities</button>
+        <p class="ts">Rank for two: each of you sets priorities, and the list shows where you both do well.</p>`;
+      $("addPartner").onclick = () => { state.people[1] = newPartner(); setEditing(1); $("personName")?.focus(); };
+      return;
+    }
+    const me = state.people[state.editing];
+    const pin = q.pin ? dests.findIndex((d) => d.lat === q.pin.lat && d.lon === q.pin.lon) : -1;
+    box.innerHTML = `<div class="who" role="group" aria-label="Whose priorities">
+        ${state.people.map((x, i) => `<button type="button" data-who="${i}" aria-pressed="${i === state.editing}">${esc(x.name)}</button>`).join("")}
+      </div>
+      <div class="who-edit">
+        <label>Name <input id="personName" type="text" maxlength="20" autocomplete="off" value="${esc(me.name)}"></label>
+        ${state.editing === 1 ? `<label>Commutes to <select id="partnerPin">
+          <option value="-1">Same as ${esc(state.people[0].name === "You" ? "yours" : state.people[0].name + "'s")}</option>
+          ${dests.map((d, i) => `<option value="${i}"${i === pin ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select></label>
+          <button class="btn ghost sm" type="button" id="removePartner">Remove ${esc(q.name)}</button>` : ""}
+      </div>`;
+    box.querySelector(".who").onclick = (e) => { const b = e.target.closest("[data-who]"); if (b) setEditing(+b.dataset.who); };
+    $("personName").onchange = (e) => {
+      me.name = cleanName(e.target.value, state.editing ? "Partner" : "You");
+      renderPeople(); update();
+    };
+    if ($("partnerPin")) $("partnerPin").onchange = (e) => {
+      const d = dests[+e.target.value];
+      q.pin = d ? { lat: d.lat, lon: d.lon } : null;
+      update();
+    };
+    if ($("removePartner")) $("removePartner").onclick = () => { state.people.length = 1; setEditing(0); };
+  }
+  function setEditing(i) {
+    state.editing = Math.min(i, state.people.length - 1);
+    renderPeople(); syncWeights(true); update();
+  }
   function buildPriorities() {
+    renderPeople();
     $("presets").innerHTML = Object.keys(PRESETS).map((n) => `<button type="button" data-p="${esc(n)}" aria-pressed="false">${esc(n)}</button>`).join("");
     $("presets").onclick = (e) => {
       const n = e.target.closest("[data-p]")?.dataset.p;
@@ -1141,6 +1282,15 @@
       ["Commute", mins != null ? `${commuteIsEstimate(p) ? "~" : ""}${Math.round(mins)} min` : "—",
         `${nd > 1 ? `Avg to ${nd} destinations` : nd === 1 ? `To ${dests.find((d) => d.on).name}` : "No destination set"}${commuteIsEstimate(p) ? (p.commutes ? " · estimate, adjusted to routed times" : " · rough estimate") : ""}`],
     ];   // the two must-haves; size, paths and the rest are under "All numbers"
+    // Rental supply: is there anything to rent here? Not scored. Listing counts exist only in a local build.
+    const vac = m.rental_vacancy != null && m.rental_homes != null
+      ? `${Math.round(m.rental_vacancy * 100)}% of ${fmtInt(m.rental_homes)} rental homes empty and for rent (Census, 5-year)` : "";
+    if (m.listings_now != null)
+      facts.push(["Rentals on the market", `${fmtInt(m.listings_now)} listed`,
+        `Now, in ${String(m.listings_area || "").split("; ").join(" + ")}${vac ? ` · ${vac}` : ""}`, true]);
+    else if (vac)
+      facts.push(["Rentals on the market", `${Math.round(m.rental_vacancy * 100)}% vacant`,
+        `Share of its ${fmtInt(m.rental_homes)} rental homes empty and for rent (Census, 5-year)`, true]);
     const { pos, neg } = strengths(r);
     const summary = r.parts.length && (pos.length || neg.length)
       ? `<div class="tags">${pos.map((x) => tag(x.k)).join("")}${neg.map((x) => tag(x.k, { weak: true })).join("")}</div>` : "";
@@ -1173,11 +1323,13 @@
         <button class="icon-btn star" type="button" data-star="${esc(r.id)}" aria-pressed="${starred}" aria-label="${starred ? "Remove from" : "Add to"} shortlist">${STAR}</button>
         <button class="icon-btn" type="button" id="closeDetail" aria-label="Close details">${CLOSE}</button>
       </div>
-      <div class="d-score"><b>${total ?? "—"}</b><span>/ 100 match</span></div>
+      <div class="d-score"><b>${total ?? "—"}</b><span>/ 100 ${state.people.length > 1 ? "for both" : "match"}</span></div>
+      ${state.people.length > 1 ? `<div class="d-both">${state.people.map((q, i) => `<span>${esc(q.name)} <b>${r.totals[i] == null ? "—" : Math.round(r.totals[i])}</b></span>`).join("")}
+        <span class="n">Ranked by the lower of the two</span></div>` : ""}
       ${r.reason ? `<div class="status">${ALERT}<span>${esc(r.reason)}</span></div>` : ""}
-      <div class="facts-grid">${facts.map(([k, v, n]) => `<div class="fact"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="n">${esc(n)}</div></div>`).join("")}</div>
+      <div class="facts-grid">${facts.map(([k, v, n, wide]) => `<div class="fact${wide ? " wide" : ""}"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="n">${esc(n)}</div></div>`).join("")}</div>
       ${hexNoteHtml(r)}
-      <div class="d-section"><h3>Why it scores ${total ?? "—"}</h3>
+      <div class="d-section"><h3>${state.people.length > 1 ? `Why it scores ${r.totals[state.editing] == null ? "—" : Math.round(r.totals[state.editing])} for ${esc(state.people[state.editing].name)}` : `Why it scores ${total ?? "—"}`}</h3>
         ${summary}
         ${composition}
         <div class="contrib contrib-head"><span>Factor</span><span>Score</span><span></span><span>Weight</span></div>
@@ -1670,6 +1822,7 @@
       layers: ["bus-lines-casing", "bus-lines", "bus-lines-hover", "bus-line-labels"] },
     { id: "bus", label: "Bus stops", note: "zoom in", has: () => L.bus?.length, layers: ["bus-stops", "bus-stops-hover", "bus-routes", "bus-stops-sel"] },
     { id: "grocery", label: "Full-size grocery", has: () => L.grocery?.length, layers: ["grocery", "grocery-hover", "grocery-count", "grocery-sel", "grocery-sel-ring"] },
+    { id: "dogs", label: "Dog runs", has: () => L.dogs?.length, layers: ["dogs", "dogs-hover", "dogs-count", "dogs-sel", "dogs-sel-ring"] },
     { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-count", "gyms-sel", "gyms-sel-ring"] },
     { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
     { id: "airports", label: "Airports", has: () => L.airports?.length, layers: ["airports", "airports-hover", "airport-codes"] },
@@ -1688,10 +1841,10 @@
   const inBoros = (r) => !r[4] || state.boroughs.has(r[4]);
   const BORO_LAYERS = ["parks-fill", "parks-line", "subway-lines", "subway-lines-hover", "bus-lines-casing", "bus-lines",
     "bus-lines-hover", "bus-line-labels",
-    "subway-stations", "subway-routes", "subway-names", "bus-stops", "bus-routes", "grocery", "gyms", "places", "grocery-count", "gyms-count", "places-count"];
+    "subway-stations", "subway-routes", "subway-names", "bus-stops", "bus-routes", "grocery", "gyms", "dogs", "places", "grocery-count", "gyms-count", "dogs-count", "places-count"];
   // layers that have a filter of their own, kept under the borough filter
   const MERGED = [">", ["get", "n"], 1];
-  const BASE_FILTER = { "grocery-count": MERGED, "gyms-count": MERGED, "places-count": MERGED };
+  const BASE_FILTER = { "grocery-count": MERGED, "gyms-count": MERGED, "dogs-count": MERGED, "places-count": MERGED };
   let boroKey = "";
   function applyBoroughFilter(force) {
     if (!map || !styleReady) return;
@@ -1704,6 +1857,7 @@
   const MARKER = {
     grocery: { light: "#008300", dark: "#008300" },
     gyms: { light: "#6250d6", dark: "#9085e9" },
+    dogs: { light: "#8a5a2b", dark: "#c08a56" },
     places: { light: "#d55181", dark: "#e87ba4" },
   };
   const markerColor = (id) => MARKER[id][theme()];
@@ -1827,6 +1981,7 @@
       props: (r) => ({ kind: "station", name: r[2], routes: r[3] || "", key: r[2] + "|" + r[3] }) },
     // key: the brand for chains (every Whole Foods, every Equinox), otherwise the name (all branches of a place)
     grocery: { rows: () => L.grocery, many: "grocery stores", props: (r) => ({ kind: "Full-size grocery store", name: r[2], key: r[3] || r[2] }) },
+    dogs: { rows: () => L.dogs, many: "dog runs", props: (r) => ({ kind: "NYC Parks dog run", name: r[2], key: r[2] }) },
     gyms: { rows: () => L.gyms, many: "gyms", props: (r) => ({ kind: "Full-size gym", name: r[2], key: r[3] || r[2] }) },
     places: { rows: () => L.places, many: "of your places", props: (r) => ({ kind: "On your list", name: r[2], key: r[3] || r[2] }) },
   };
@@ -1939,6 +2094,7 @@
       // Points wait for street-level zooms: at city zoom the map's answer is the neighborhood colors
       ["grocery", "errands", 13],
       ["gyms", "gym", 13],
+      ["dogs", "dogs", 13],
       ["places", "favorites", 12],
     ];
     for (const [id, iconKey, minzoom] of badges) {
@@ -1984,7 +2140,7 @@
         paint: { "text-color": ink, "text-halo-color": halo, "text-halo-width": 1.6 } });
     }
     // Selected markers (everything of the clicked kind) sit above all other points, at every zoom
-    for (const id of ["grocery", "gyms", "places", "bus-stops"]) {
+    for (const id of ["grocery", "gyms", "dogs", "places", "bus-stops"]) {
       if (!map.getLayer(id)) continue;
       map.addLayer({ id: id + "-sel-ring", type: "circle", source: id, filter: SEL_NONE,
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 9, 13, 13, 16, 17], "circle-color": "rgba(0,0,0,0)",
@@ -2065,7 +2221,7 @@
     for (const c of CONTEXT) for (const id of c.layers)
       if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", layerOn[c.id] ? "visible" : "none");
   }
-  const POINT_LAYERS = ["airports", "places", "gyms", "grocery", "subway-stations", "bus-stops"];
+  const POINT_LAYERS = ["airports", "places", "gyms", "dogs", "grocery", "subway-stations", "bus-stops"];
   function pointHtml(f) {
     const p = f.properties;
     if (p.kind === "airport") return airportCardHtml(p.key.toLowerCase(), p.name);
@@ -2139,12 +2295,9 @@
       const w = parts.reduce((a, [, x]) => a + x, 0);
       s.commute = w ? parts.reduce((a, [v, x]) => a + v * x, 0) / w : null;
     }
-    let num = 0, den = 0;
-    for (const k of FACTORS) {
-      const w = state.weights[k] || 0;
-      if (w > 0 && s[k] != null) { num += s[k] * w; den += w; }
-    }
-    return { s, total: den ? num / den : null, mins, pop: row[2], few: row[2] < HX.few_people };
+    // the partner's commute is the neighborhood's (hexes carry routed times to your pins only)
+    const totals = state.people.map((q, i) => weighted(i === 1 && partnerCommute ? { ...s, commute: r.ss[1].commute } : s, q.weights).total);
+    return { s, total: bothTotal(totals), mins, pop: row[2], few: row[2] < HX.few_people };
   }
   let hexShown = null;
   function hexData() {
@@ -2216,14 +2369,14 @@
 
   // ---------- marker selection: click a marker to light up every marker of the same kind ----------
   const SEL_NONE = ["==", ["get", "key"], "\u0000none"];
-  const SEL_LAYERS = ["grocery", "gyms", "places", "bus-stops", "subway-stations"];
+  const SEL_LAYERS = ["grocery", "gyms", "dogs", "places", "bus-stops", "subway-stations"];
   let selLines = { sub: "", bus: "" };
   function selectMarker(f) {
     const p = f.properties, layer = f.layer.id.replace(/-(hover|sel|sel-ring|count)$/, "");
     if (isCluster(layer, p))
       return map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(GROUP_SPLIT_Z, Math.floor(map.getZoom()) + 2) });
     if (state.marker && state.marker.layer === layer && state.marker.key === p.key) return clearMarker();
-    const src = { grocery: L.grocery, gyms: L.gyms, places: L.places, "bus-stops": L.bus, "subway-stations": L.subway?.stations }[layer] || [];
+    const src = { grocery: L.grocery, gyms: L.gyms, dogs: L.dogs, places: L.places, "bus-stops": L.bus, "subway-stations": L.subway?.stations }[layer] || [];
     const keyOf = layer === "subway-stations" ? (r) => r[2] + "|" + r[3] : layer === "bus-stops" ? (r) => r[2] : (r) => r[3] || r[2];
     const label = layer === "subway-stations" ? p.name : layer === "bus-stops" ? p.name : p.key;
     state.marker = { layer, key: p.key, label, routes: p.routes || "",
@@ -2494,10 +2647,20 @@
   if (linkSelect) select(linkSelect, true);
   $("copyLink").onclick = async () => {
     writeLink();
-    let ok = false;
-    try { await navigator.clipboard.writeText(location.href); ok = true; } catch (e) {}
-    $("copyMsg").textContent = ok ? "Link copied. It opens this ranking and must-haves (not your commute pins)." :
-      "Copy the address bar: it holds this ranking.";
+    let url = location.href, ok = false;
+    // For a couple, the link also carries the commute pins (so each sees the other's commute); otherwise pins stay out
+    if (partner() && dests.length) {
+      const h = new URLSearchParams(location.hash.slice(1));
+      h.set("pins", dests.map((d) => `${d.lat},${d.lon},${cleanName(d.name, "Pin")}`).join("|"));
+      h.set("yd", String(Math.max(0, dests.findIndex((d) => d.on))));
+      const pd = partner().pin ? dests.findIndex((d) => d.lat === partner().pin.lat && d.lon === partner().pin.lon) : -1;
+      if (pd >= 0) h.set("pd", String(pd));
+      url = location.href.split("#")[0] + "#" + h.toString().replace(/%3A/g, ":").replace(/%2C/g, ",");
+    }
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {}
+    $("copyMsg").textContent = !ok ? "Copy the address bar: it holds this ranking." : partner()
+      ? `Link copied for ${partner().name}. It opens both rankings, the must-haves and your commute pins.`
+      : "Link copied. It opens this ranking and must-haves (not your commute pins).";
     $("copyMsg").hidden = false;
     clearTimeout($("copyMsg")._t);
     $("copyMsg")._t = setTimeout(() => { $("copyMsg").hidden = true; }, 5000);

@@ -18,8 +18,11 @@ import pandas as pd
 FACTORS: dict[str, dict] = {
     "running": {
         "label": "Running",
-        "help": "Dedicated paths within ~1 km, distance to a 20+ acre park, and where you actually run (your GPS files).",
-        "components": [("run_path_m", +1, 0.45), ("big_park_dist_m", -1, 0.20), ("activity_density", +1, 0.35)],
+        "help": "Dedicated paths within ~1 km, the walk to a car-free route long enough for a 5K (park loops, greenways, "
+                "waterfront paths: 5 min or less = 100, 30+ min = 0), distance to a 20+ acre park, and where you "
+                "actually run (your GPS files, when you have some).",
+        "components": [("run_path_m", +1, 0.30), ("run5k_score", "abs", 0.30), ("big_park_dist_m", -1, 0.15),
+                       ("activity_density", +1, 0.25)],
     },
     # Your bars & restaurants are shown on the map as context, not scored. The favorites step
     # still geocodes them and computes fav_score / food_drink_600m as raw numbers for the detail panel.
@@ -64,6 +67,11 @@ FACTORS: dict[str, dict] = {
                 "nearest within 400 m = 100, 2 km+ = 0; plus how many are within ~1 km.",
         "components": [("nearest_gym_full_m", "gym", 0.75), ("gyms_walk", +1, 0.25)],
     },
+    "dogs": {
+        "label": "Dog runs",
+        "help": "Walk to the nearest NYC Parks dog run: 300 m or less = 100, 1.5 km+ = 0; plus how many are within ~1 km.",
+        "components": [("nearest_dog_run_m", "dog", 0.8), ("dog_runs_walk", +1, 0.2)],
+    },
     "airports": {
         "label": "Airports",
         "help": "Transit time to JFK, LaGuardia and Newark, averaged: 55 min or less = 100, 115+ min = 0. "
@@ -85,12 +93,6 @@ FACTORS: dict[str, dict] = {
         "label": "Breathing room",
         "help": "Lower population density. Leave at 0 if you don't mind crowds.",
         "components": [("pop_density_km2", -1, 1.0)],
-    },
-    "run5k": {
-        "label": "5K routes",
-        "help": "Walk to the nearest car-free route long enough for a 5K: park loops, greenways, waterfront paths "
-                "(OpenStreetMap). 5 min or less = 100, 30+ min = 0.",
-        "components": [("run5k_score", "abs", 1.0)],
     },
     "familiarity": {
         "label": "Familiar areas",
@@ -132,6 +134,14 @@ GYM_GOOD_M, GYM_BAD_M = 400, 2000   # 100 within a 5-min walk, 0 beyond ~25 min
 def gym_curve(dist_m):
     d = np.asarray(dist_m, float)
     return np.clip((GYM_BAD_M - d) / (GYM_BAD_M - GYM_GOOD_M), 0, 1) * 100
+
+
+DOG_GOOD_M, DOG_BAD_M = 300, 1500   # a dog gets walked twice a day: 100 within ~4 min, 0 beyond ~20 min
+
+
+def dog_curve(dist_m):
+    d = np.asarray(dist_m, float)
+    return np.clip((DOG_BAD_M - d) / (DOG_BAD_M - DOG_GOOD_M), 0, 1) * 100
 
 
 RUN5K_GOOD_MIN, RUN5K_BAD_MIN = 5, 30   # walking minutes to a popular 5K route (you'd jog it in about half)
@@ -181,6 +191,8 @@ def component_score(features: pd.DataFrame, col: str, how, mask: pd.Series, cfg:
         return pd.Series(familiar_curve(v), index=v.index)
     if how == "gym":
         return pd.Series(gym_curve(v), index=v.index)
+    if how == "dog":
+        return pd.Series(dog_curve(v), index=v.index)
     if how == "road":
         return pd.Series(road_curve(v), index=v.index)
     if how == "abs":          # already 0-100
