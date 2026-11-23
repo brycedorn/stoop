@@ -83,9 +83,11 @@
   // How strongly the colors cover the map: full at city zoom, fading as you zoom in so streets, parks and labels
   // show through at street level; the legend's "Fill" slider scales it at any zoom.
   const FILL_BASE = 0.88, FILL_HOVER = 1;
+  // Edges mode is a desktop view: thin bands don't read on a phone's small map, so phones always fill (the saved choice stays)
+  const shadeNow = () => (MOBILE() ? "fill" : state.shade);
   function fillOpacity(extra = null) {
     const hov = ["boolean", ["feature-state", "hover"], false];
-    if (state.shade === "edge") return ["case", hov, 0.22 * veil, 0];   // a light wash only under the pointer
+    if (shadeNow() === "edge") return ["case", hov, 0.22 * veil, 0];   // a light wash only under the pointer
     const k = state.fill * veil;
     const at = (f) => ["*", k * f, extra ? ["case", hov, FILL_HOVER, extra, 0.35, FILL_BASE] : ["case", hov, FILL_HOVER, FILL_BASE]];
     return ["interpolate", ["linear"], ["zoom"], 12, at(1), 13.5, at(0.7), 15, at(0.45), 17, at(0.3)];
@@ -780,6 +782,15 @@
   function closeOnOutside(id) {
     document.addEventListener("click", (e) => { if (!e.composedPath().includes($(id))) $(id).open = false; });
   }
+  // A top bar menu opens under its button; where the bar is crowded, slide it back inside the window instead
+  for (const box of document.querySelectorAll(".topbar details.dropdown")) box.addEventListener("toggle", () => {
+    const menu = box.querySelector(".dd-menu");
+    if (!menu || !box.open) return;
+    menu.style.translate = "";
+    const r = menu.getBoundingClientRect(), edge = 8;
+    const dx = r.right > innerWidth - edge ? innerWidth - edge - r.right : r.left < edge ? edge - r.left : 0;
+    if (dx) menu.style.translate = `${Math.round(dx)}px 0`;
+  });
 
   // ---------- tabs ----------
   function setTab(name) {
@@ -1336,7 +1347,7 @@
     const lo = banded ? [0, ...thresholds] : [Math.min(...vis), ...thresholds];
     const ticks = lo.map((v) => Math.round(v));
     // Edges mode: the swatches are bands as thick as the map draws them, and a note says what dashed means
-    const edge = state.shade === "edge", solid = solidRamp();
+    const edge = shadeNow() === "edge", solid = solidRamp();
     const html = `<div class="swatches${edge ? " as-bands" : ""}">${cols.map((c, i) => edge
         ? `<span style="background:${solid[i]};height:${Math.round(10 * EDGE_K[i] * 2) / 2}px"></span>` : `<span style="background:${c}"></span>`).join("")}</div>
       <div class="ticks">${ticks.map((t) => `<span>${t}+</span>`).join("")}</div>
@@ -1361,7 +1372,7 @@
       avail.map((c) => `<label class="lm-row"><input type="checkbox" data-layer="${c.id}" ${layerOn[c.id] ? "checked" : ""}>
         <span class="sw sw-${c.id}"></span>${esc(c.label)}${c.note ? `<small>${esc(c.note)}</small>` : ""}</label>`).join("") +
       `<div class="lm-sep"></div>` : "") + `<div class="lm-h">Key</div>
-      <div class="lm-row key"><span class="key-ic"><span class="pin">1</span></span>Top 10 matches, by rank</div>
+      <div class="lm-row key"><span class="key-ic"><span class="pin">1</span></span>Top ${topPins()} matches, by rank</div>
       <div class="lm-row key"><span class="key-ic"><span class="pin short">${STAR}</span></span>On your shortlist</div>
       <div class="lm-row key"><span class="key-ic"><span class="sw sw-short"></span></span>Shortlisted, outside your must-haves</div>
       <div class="lm-row key"><span class="key-ic"><span class="sw sw-out"></span></span>Outline only: outside your must-haves</div>
@@ -1711,7 +1722,10 @@
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     // Phones: the credits start collapsed to the (i) button (tap to read them), so they don't sit on the legend
-    map.once("load", () => { if (MOBILE()) document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"); });
+    map.once("load", () => {
+      if (MOBILE()) document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+      syncMapInteract(); frameStrip();   // phones: the strip starts still, framed on the matches
+    });
     // The grid can settle after the map is created (fonts, mobile toolbar): keep the canvas in sync.
     new ResizeObserver(() => map.resize()).observe($("mapwrap"));
     map.on("style.load", addLayers);
@@ -2357,10 +2371,20 @@
     return out.filter(Boolean);
   }
 
+  // On a phone's small map the transit lines and place icons crowd out the match colors at city zoom, so they
+  // start from LATE_ZOOM there; parks and airports stay. Desktop keeps each layer's own zoom range.
+  const LATE_ON_PHONE = new Set(["subway", "busroutes", "bus", "grocery", "dogs", "gyms", "places"]), LATE_ZOOM = 13;
+  const ownMinZoom = new Map();
   function applyLayerVisibility() {
     if (!map) return;
-    for (const c of CONTEXT) for (const id of c.layers)
-      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", layerOn[c.id] ? "visible" : "none");
+    for (const c of CONTEXT) for (const id of c.layers) {
+      const L = map.getLayer(id);
+      if (!L) continue;
+      map.setLayoutProperty(id, "visibility", layerOn[c.id] ? "visible" : "none");
+      if (!ownMinZoom.has(id)) ownMinZoom.set(id, L.minzoom || 0);
+      const min = MOBILE() && LATE_ON_PHONE.has(c.id) ? Math.max(ownMinZoom.get(id), LATE_ZOOM) : ownMinZoom.get(id);
+      if ((L.minzoom || 0) !== min) map.setLayerZoomRange(id, min, L.maxzoom ?? 24);
+    }
   }
   const POINT_LAYERS = ["airports", "places", "gyms", "dogs", "grocery", "subway-stations", "bus-stops"];
   function pointHtml(f) {
@@ -2620,7 +2644,7 @@
   // Each band is two layers (solid, and dashed for very weak matches): this MapLibre can't vary the dash per shape.
   function paintEdges() {
     if (!map || !styleReady) return;
-    const edge = state.shade === "edge", k = state.fill * veil;
+    const edge = shadeNow() === "edge", k = state.fill * veil;
     const set = (ids, color, v, w, extra) => {
       if (!map.getLayer(ids[0])) return;
       const weak = ["all", [">=", v, 0], ["<", v, WEAK_BELOW]];
@@ -2669,9 +2693,11 @@
     return root;
   }
 
+  const topPins = () => (MOBILE() ? 5 : 10);
   function renderPins(force) {
-    // Top 10 matches, plus every shortlisted area (starred), whether or not it matches
-    const top = results.filter((r) => (r.rank && r.rank <= 10) || shortlist.includes(r.id));
+    // Top 10 matches (5 on a phone, where 10 pile up), plus every shortlisted area (starred), whether or not it matches
+    const n = topPins();
+    const top = results.filter((r) => (r.rank && r.rank <= n) || shortlist.includes(r.id));
     // Selection isn't in the key: selecting just toggles a class instead of rebuilding every marker
     const key = top.map((r) => r.id + (shortlist.includes(r.id) ? "*" : "") + r.rank).join(",");
     for (const [id, mk] of pins) mk.getElement().firstChild.classList.toggle("sel", id === state.selected);
@@ -2685,12 +2711,14 @@
       el.type = "button";
       const starred = shortlist.includes(r.id);
       el.className = "pin" + (starred ? " short" : "") + (r.id === state.selected ? " sel" : "");
-      el.innerHTML = (starred ? STAR : "") + (r.rank && r.rank <= 10 ? r.rank : "");
+      el.innerHTML = (starred ? STAR : "") + (r.rank && r.rank <= n ? r.rank : "");
       el.setAttribute("aria-label", `${r.rank ? "#" + r.rank + " " : ""}${r.f.properties.name}${starred ? ", shortlisted" : ""}`);
       el.onclick = (e) => { e.stopPropagation(); select(r.id, false); };
       el.onmouseenter = () => setHover(r.id, true);
       el.onmouseleave = () => setHover(null, true);
-      pins.set(r.id, new maplibregl.Marker({ element: markerRoot(el) }).setLngLat(at).addTo(map));
+      const root = markerRoot(el);
+      if (MOBILE() && r.rank) root.style.zIndex = String(100 - r.rank);   // phones: pins overlap more, so #1 sits on top
+      pins.set(r.id, new maplibregl.Marker({ element: root }).setLngLat(at).addTo(map));
     }
   }
 
@@ -2727,7 +2755,8 @@
       // wide screens: the panel floats over the map's right edge, so keep the area clear of it
       const pad = MOBILE() ? { top: 40, bottom: 40, left: 40, right: 40 }
         : { top: 80, bottom: 80, left: 80, right: DOCKED() ? 80 : 420 };
-      map.fitBounds(bbox([f]), { padding: pad, maxZoom: 14, duration: motionMs(600) });
+      // the phone strip is small: stop short enough to keep the streets around it in view
+      map.fitBounds(bbox([f]), { padding: pad, maxZoom: MOBILE() && !phoneMap.full ? 12 : 14, duration: motionMs(600) });
     }
     if (id && !fly && state.tab === "matches") {
       const li = document.querySelector(`#ranking li[data-id="${CSS.escape(id)}"]`);
@@ -2787,6 +2816,7 @@
     }
     if (e.key !== "Escape") return;
     if (intro.step) endIntro();
+    else if (phoneMap.full && $("detail").hidden) setMapFull(false);
     else if (state.pickingArea) setAreaPickMode(false);
     else if (state.addingDest) setAddMode(false);
     else if (!$("compare").hidden) closeCompare();
@@ -2809,6 +2839,7 @@
     if (mode === "auto") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = mode;
     try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+    syncThemeColor();
     if (theme() !== before) themeChanged();
   }
   for (const input of document.querySelectorAll('input[name="theme"]')) {
@@ -2851,6 +2882,49 @@
     clearTimeout($("copyMsg")._t);
     $("copyMsg")._t = setTimeout(() => { $("copyMsg").hidden = true; }, 5000);
   };
+  // ---------- phones: the list comes first, the map is a strip above it ----------
+  // On a phone the map is a short strip that stays at the top while the list scrolls. It frames your matches (or
+  // the open neighborhood) and can't be dragged, so a finger on it scrolls the page; a tap opens it full screen,
+  // where it pans, zooms and opens neighborhoods as usual. Desktop never sees any of this.
+  const phoneMap = { full: false };
+  function syncMapInteract() {
+    if (!map) return;
+    const live = !MOBILE() || phoneMap.full;
+    for (const h of [map.dragPan, map.scrollZoom, map.touchZoomRotate, map.doubleClickZoom, map.keyboard, map.boxZoom])
+      if (h) live ? h.enable() : h.disable();
+  }
+  function frameStrip() {
+    if (!map || !MOBILE() || phoneMap.full) return;
+    const fs = state.selected ? [BY_ID.get(state.selected)] : results.filter((r) => r.rank).map((r) => r.f);
+    map.resize();   // the strip may have just shrunk from full screen: frame it at its new size
+    if (fs.length) map.fitBounds(bbox(fs), { padding: 24, maxZoom: 12.5, duration: motionMs(400) });
+  }
+  function setMapFull(on) {
+    phoneMap.full = on && MOBILE();
+    document.body.classList.toggle("map-full", phoneMap.full);
+    $("mapOpen").setAttribute("aria-expanded", String(phoneMap.full));
+    syncMapInteract();
+    map?.resize();
+    if (phoneMap.full) $("mapClose").focus({ preventScroll: true });
+    else { frameStrip(); if (on === false && document.activeElement === $("mapClose")) $("mapOpen").focus({ preventScroll: true }); }
+  }
+  $("mapOpen").onclick = () => setMapFull(true);
+  $("mapClose").onclick = () => setMapFull(false);
+  // crossing the phone width (a rotated tablet, a resized window): switch the map's behavior to match
+  matchMedia("(max-width: 860px)").addEventListener("change", () => {
+    setMapFull(false); syncMapInteract(); paintMatchColors(); renderLegend(); renderLayersMenu(); renderPins(true); applyLayerVisibility();
+  });
+  function syncThemeColor() {
+    // the status bar takes the top bar's color; a pinned Light/Dark overrides the system's
+    const c = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim();
+    for (const m of document.querySelectorAll('meta[name="theme-color"]')) {
+      if (m.dataset.media === undefined) { m.dataset.media = m.getAttribute("media") || ""; m.dataset.color = m.content; }
+      if (themeMode === "auto") { m.setAttribute("media", m.dataset.media); m.content = m.dataset.color; }
+      else { m.removeAttribute("media"); m.content = c; }
+    }
+  }
+  syncThemeColor();
+
   // ---------- the first-visit guide ----------
   // Three steps: what stoop does (over a map with no colors yet), rank your priorities (the list is lifted above a
   // dimmed page), then the colors fade in with a note on how to read them. "How it works" in the panel replays it.

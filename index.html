@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>stoop · NYC neighborhood finder</title>
   <meta name="description" content="Rank NYC neighborhoods by what matters to you: rent, commute, running, your favorite places, safety and more.">
   <meta name="color-scheme" content="light dark">
@@ -24,7 +24,7 @@
   <!-- Must-haves: one filter row above everything it scopes -->
   <header class="topbar">
     <div class="brand">
-      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path class="mk-door" d="M19 17V9a4 4 0 0 1 8 0v8z"/><circle cx="24.6" cy="13.4" r=".9"/><path d="M3 29v-3h4.5v-3H12v-3h4.5v-3H29v12z"/><path class="mk-rail" d="M5.5 26v-6.5L17 12v5"/><circle cx="5.5" cy="19.3" r="1.7"/></svg>
+      <svg class="mark" viewBox="0 0 30 30" aria-hidden="true"><path d="M2 23h5v-5h5v-5h5v-5h11"/></svg>
       <div class="brand-text">
         <span class="logo">stoop</span>
         <span class="tagline">NYC neighborhood finder</span>
@@ -162,7 +162,10 @@
   <main id="mapwrap">
     <div id="map" role="region" aria-label="Map of NYC neighborhoods colored by match"></div>
 
+    <!-- phones: the whole strip opens the map full screen; Back returns to the list -->
+    <button class="map-open" id="mapOpen" type="button" aria-expanded="false" aria-label="Open the map full screen"><span class="btn map-btn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Map</span></button>
     <div class="map-tools">
+      <button class="btn map-btn map-close" id="mapClose" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>List</button>
       <button class="btn map-btn" id="fitBtn" type="button">Zoom to matches</button>
       <details class="map-layers" id="layersBox">
         <summary class="btn map-btn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5"/></svg>Layers &amp; key</summary>
@@ -193,7 +196,8 @@
   <script src="data/stoop.js"></script>
   <script src="data/layers.js" onerror="window.STOOP_LAYERS = {}"></script>
   <script src="data/airports.js" onerror="window.STOOP_AIRPORTS = {}"></script>
-  <script src="data/hexes.js" onerror="window.STOOP_HEXES = null"></script>
+  <!-- the hex detail (about 1.5 MB) is a desktop view: phones skip the download -->
+  <script>if (!matchMedia("(max-width: 860px)").matches) document.write('<script src="data/hexes.js" onerror="window.STOOP_HEXES = null"><\/script>');</script>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <!-- tooltip positioning: flips and shifts to stay inside the map (optional; app.js falls back without it) -->
   <script src="https://cdn.jsdelivr.net/npm/@floating-ui/core@1.6.8/dist/floating-ui.core.umd.min.js"></script>

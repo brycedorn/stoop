@@ -134,10 +134,10 @@ code { font-family: var(--mono); font-size: 12px; background: var(--wash); paddi
 }
 .brand { display: flex; align-items: center; gap: 9px; flex: none; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-/* the mark: a brownstone stoop, ink steps and railing up to a taxi-yellow door */
-.mark { width: 30px; height: 30px; flex: none; fill: currentColor; }
-.mark .mk-door { fill: var(--mark); stroke: currentColor; stroke-width: 1.8; }
-.mark .mk-rail { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* the mark: one line, three steps up to the stoop's landing. Drawn on a 30-unit grid and always shown at
+   30 px so the 2 px line sits on whole pixels; other sizes blur it (Firefox shows that most) */
+.mark { width: 30px; height: 30px; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; }
 .logo { font: 800 22px/1 var(--display); letter-spacing: -.035em; }
 .tagline { font-size: 12px; color: var(--ink-3); }
 .filters { display: flex; align-items: center; gap: 18px; flex: 1; min-width: 0; }
@@ -234,7 +234,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
 .topbar.fit3 .seg-row span { min-width: 30px; padding: 0 6px; }
 .topbar.fit3 .filters { gap: 12px; }
 .topbar.fit3 .brand { gap: 6px; }
-.topbar.fit3 .brand .mark { width: 24px; height: 24px; }
 .topbar.fit-wrap .filters { flex-wrap: wrap; row-gap: 8px; }
 .ft-sum { color: var(--ink-2); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; align-self: flex-end; height: 32px; }
@@ -502,6 +501,7 @@ details.how li + li { margin-top: 4px; }
 .sw-hexes { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: linear-gradient(90deg, var(--ramp-lo, #c38ccd) 50%, var(--ramp-hi, #5e1f75) 50%); border-radius: 0; }
 .map-tools { position: absolute; top: 14px; left: 14px; right: 60px; z-index: 3; display: flex; gap: 8px; align-items: flex-start; pointer-events: none; }
 .map-tools > * { pointer-events: auto; }
+.map-open, .map-close { display: none; }   /* phone only: the map strip opens full screen, Back returns to the list */
 .map-layers { position: relative; }
 .map-layers > summary { list-style: none; }
 .map-layers > summary::-webkit-details-marker { display: none; }
@@ -718,7 +718,6 @@ body.intro-held .pin { opacity: 0; }   /* no ranking shows before the priorities
 .intro p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.5; text-wrap: pretty; }
 .intro .intro-of { margin-bottom: 4px; color: var(--ink-3); font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
 .intro-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-.intro-head .mark { width: 34px; height: 34px; }
 .intro-head .logo { font-size: 24px; }
 .intro-steps { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 8px; font-size: 13.5px; color: var(--ink-2); }
 .intro-steps li { counter-increment: s; position: relative; padding-left: 28px; line-height: 1.45; }
@@ -756,20 +755,40 @@ body.intro-held .pin { opacity: 0; }   /* no ranking shows before the priorities
   .range-head { gap: 6px; white-space: nowrap; }
   .filters { gap: 10px; }
   .dd-btn { max-width: 150px; }
-  .dd-menu.area-menu { left: auto; right: 0; }   /* opens leftward: on a narrow bar Radius sits close to the window edge */
   .toggle .t-long { display: none; }
   .toggle .t-short { display: inline; }
   .count .cl { display: none; }
 }
 @media (max-width: 860px) {
-  :root { --topbar-h: auto; }
+  :root { --topbar-h: auto; --strip-h: 30vh; --strip-h: 30svh; }
   /* phone order: filters, map, list */
   body { display: flex; flex-direction: column; height: auto; }
   .topbar { order: 0; flex-wrap: wrap; gap: 8px 12px; padding: 12px 16px 14px; }
-  #mapwrap { order: 1; height: 50vh; height: 50svh; flex: none; }
-  #panel { order: 2; border-right: 0; min-height: 60vh; }
+  /* the list comes first; the map is a still strip that stays at the top while the list scrolls under it */
+  #mapwrap { order: 1; height: 30vh; height: var(--strip-h); flex: none; position: sticky; top: 0; z-index: 6; box-shadow: 0 1px 0 var(--hair); }
+  #panel { order: 2; border-right: 0; min-height: 60vh; scroll-margin-top: var(--strip-h); }
+  .topbar { z-index: 7; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }   /* its menus drop over the strip */
+  .tabs { position: sticky; top: var(--strip-h); z-index: 5; background: var(--surface); }
+  html { scroll-padding-top: calc(var(--strip-h) + 60px); }   /* rows scrolled into view land below the strip and tabs */
+  body:has(#detail:not([hidden])) #tooltip { display: none; }   /* the sheet already says it */
+  #map { z-index: 0; }
+  body:has(#intro:not([hidden])) #mapwrap { z-index: 23; }   /* the guide's card lives in the strip: lift it above the dimming */   /* pins stack inside the map, under the strip's tap target */
+  .map-open { display: block; position: absolute; inset: 0; z-index: 4; padding: 0; border: 0; background: none; cursor: pointer; }
+  .map-open .btn { position: absolute; top: 10px; right: 10px; pointer-events: none; }
+  body:not(.map-full) :is(.map-tools, .maplibregl-ctrl-top-right, .legend-card .colorby) { display: none; }
+  /* full screen: the map as on desktop, minus what needs a mouse; Back sits where the eye starts */
+  body.map-full #mapwrap { position: fixed; inset: 0; height: auto; z-index: 24; }
+  html:has(body.map-full) { overflow: hidden; }
+  body.map-full .map-open { display: none; }
+  body.map-full .map-close { display: inline-flex; }
+  body.map-full .map-tools { top: calc(10px + env(safe-area-inset-top, 0px)); }
+  body.map-full .maplibregl-ctrl-top-right { top: env(safe-area-inset-top, 0px); }
+  body.map-full .legend-card { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .legend-look { display: none; }   /* palette, Fill/Edges and strength are desktop settings */
+  body:not(.map-full) .legend-card { right: auto; width: 150px; padding: 6px 8px 5px; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  /* text fields at 16px: smaller makes iOS zoom the page in when one gets focus */
+  :is(input:not([type=range], [type=checkbox], [type=radio]), select, textarea) { font-size: 16px !important; }
   .brand { gap: 8px; }
-  .brand .mark { width: 26px; height: 26px; }
   .brand-text { flex-direction: row; align-items: baseline; gap: 8px; }
   .count { margin-left: auto; font-size: 12px; }
   .filters-toggle { display: flex; order: 2; flex-basis: 100%; justify-content: flex-start; gap: 10px; min-width: 0; }
@@ -796,7 +815,7 @@ body.intro-held .pin { opacity: 0; }   /* no ranking shows before the priorities
   /* bottom sheet: opens at ~45% so the selected area stays visible above it; the grab bar expands it */
   #detail {
     position: fixed; inset: auto 0 0 0; width: auto; margin: 0; max-height: 45vh; max-height: 45svh;
-    border-radius: 16px 16px 0 0; z-index: 25; padding-top: 6px;
+    border-radius: 16px 16px 0 0; z-index: 25; padding-top: 6px; padding-bottom: env(safe-area-inset-bottom, 0px);
     animation: rise .22s var(--ease); transition: max-height .25s var(--ease);
   }
   #detail.full { max-height: 88vh; max-height: 88svh; }
@@ -835,7 +854,7 @@ body.intro-held .pin { opacity: 0; }   /* no ranking shows before the priorities
   input[type=range] { height: 40px; margin: 0; }
   #compare { padding: 0; place-items: end stretch; }
   /* the guide is a card pinned to the bottom of the screen; while ranking, the list scrolls clear of it */
-  .intro, .intro[data-step] { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; translate: none; padding: 16px 18px; }
+  .intro, .intro[data-step] { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; translate: none; padding: 16px 18px; }
   .intro[data-step="priorities"]::before { display: none; }
   .intro[data-step="priorities"] p { font-size: 13px; }
   body.intro-prio #panel { padding-bottom: 200px; }
