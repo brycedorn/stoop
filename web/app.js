@@ -635,6 +635,31 @@
       (state.area.on ? ` · ${fmtMi(state.area.km)} radius` : "");
     syncArea();
   }
+  // ---------- top bar: one row, tightened only as far as it needs ----------
+  // Widths depend on fonts (Mac and Windows differ), the destination's name and whether Reset shows, so fixed
+  // breakpoints either wrap the row or squeeze it for nothing. Step through tighter levels until it fits.
+  const FIT_LEVELS = 3;
+  function fitTopbar() {
+    const bar = document.querySelector(".topbar"), filters = $("filters");
+    if (!bar || !filters) return;
+    for (let i = 1; i <= FIT_LEVELS; i++) bar.classList.remove("fit" + i);
+    bar.classList.remove("fit-wrap");
+    if (MOBILE()) return;
+    const fits = () => {
+      const kids = [...filters.children].filter((el) => el.offsetWidth > 0);
+      const gap = parseFloat(getComputedStyle(filters).columnGap) || 0;
+      return kids.reduce((w, el) => w + el.offsetWidth, 0) + gap * (kids.length - 1) <= filters.clientWidth;
+    };
+    for (let i = 1; i <= FIT_LEVELS && !fits(); i++) bar.classList.add("fit" + i);
+    if (!fits()) bar.classList.add("fit-wrap");   // a narrow window: a second row beats controls running off the edge
+  }
+  let fitQueued = false;
+  const queueFit = () => { if (!fitQueued) { fitQueued = true; requestAnimationFrame(() => { fitQueued = false; fitTopbar(); }); } };
+  // the bar's width, and each control's (a new destination name, Reset showing, web fonts arriving)
+  if ($("filters")) {
+    const fitRO = new ResizeObserver(queueFit);
+    for (const el of [document.querySelector(".topbar"), $("filters"), ...$("filters").children, $("count")]) if (el) fitRO.observe(el);
+  }
   // ---------- area filter (radius around a draggable center) ----------
   // Point-in-polygon over every neighborhood, and syncArea asks three times per slider tick: remember the last one
   let areaNameAt = null, areaName = "";
@@ -1875,6 +1900,7 @@
       "line-color": dark ? "#f0efec" : "#0b0b0b", "line-dasharray": [2, 1.5],
       "line-width": ["case", ["all", ["boolean", ["feature-state", "short"], false], ["!", ["boolean", ["feature-state", "on"], false]]], 1.6, 0],
     } }, firstLabel);
+    addHexHoverLayer(firstLabel, dark);
     if (!map.getSource("area")) map.addSource("area", { type: "geojson", data: areaGeo() });
     map.addLayer({ id: "area-mask", type: "fill", source: "area", filter: ["==", ["get", "part"], "mask"],
       paint: { "fill-color": dark ? "#000000" : "#0b0b0b", "fill-opacity": dark ? 0.35 : 0.12 } }, firstLabel);
@@ -1918,7 +1944,7 @@
     { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-count", "gyms-sel", "gyms-sel-ring"] },
     { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
     { id: "airports", label: "Airports", has: () => L.airports?.length, layers: ["airports", "airports-hover", "airport-codes"] },
-    { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-edge", "hex-line"] },
+    { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-edge", "hex-line", "hex-hover"] },
   ];
   let layerOn = Object.fromEntries(CONTEXT.map((c) => [c.id, true]));
   try { Object.assign(layerOn, JSON.parse(localStorage.getItem(LAYER_KEY) || "{}")); } catch (e) {}
@@ -2428,9 +2454,15 @@
     map.addLayer({ id: "hex-edge", type: "line", source: "hexes", layout: { "line-join": "miter" }, paint: {
       "line-color": "rgba(0,0,0,0)", "line-opacity": 0, "line-width": EDGE_W_HEX, "line-offset": halfOff(EDGE_W_HEX) } }, beforeId);
     map.addLayer({ id: "hex-line", type: "line", source: "hexes", paint: {
-      "line-color": ["case", ["boolean", ["feature-state", "hover"], false], dark ? "#f0efec" : "#0b0b0b", dark ? "#1a1a19" : "#ffffff"],
-      "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2, 0.6],
-      "line-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0.7] } }, beforeId);
+      "line-color": dark ? "#1a1a19" : "#ffffff", "line-width": 0.6, "line-opacity": 0.7 } }, beforeId);
+  }
+  // The hovered hex's outline gets a layer of its own above the neighborhood borders: an edge hex is mostly
+  // border, and drawn in hex-line its outline sat under those lines (and under its neighbors' outlines).
+  function addHexHoverLayer(beforeId, dark) {
+    if (!HX) return;
+    map.addLayer({ id: "hex-hover", type: "line", source: "hexes", layout: { "line-join": "round" }, paint: {
+      "line-color": dark ? "#f0efec" : "#0b0b0b", "line-width": 2,
+      "line-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0] } }, beforeId);
   }
   let hexHover = null;
   function setHexHover(id) {

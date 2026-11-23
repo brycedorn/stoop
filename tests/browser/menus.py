@@ -46,17 +46,24 @@ with sync_playwright() as pw:
         check(f"{w}: borough checkboxes 16 px", cb == [16, 16], cb)
         page.close()
     b.close()
-print(f"{sum(res)}/{len(res)} passed")
-# one-row top bar on wide screens: every filter control shares the toggle's row
+# One-row top bar on laptop and desktop screens, with Reset showing and with wider text (Mac fonts run wider):
+# the over-budget toggle stays on the controls' row and the bar keeps its height. Narrow windows may wrap.
+ROW = """() => { const t = document.querySelector('.topbar'), kids = [...document.querySelectorAll('.filters > *')].filter(e => e.offsetParent);
+  const tg = document.querySelector('.filters .toggle').getBoundingClientRect(), first = kids[0].getBoundingClientRect();
+  return { h: Math.round(t.getBoundingClientRect().height), dy: Math.round(tg.bottom - first.bottom), fit: t.className.replace('topbar', '').trim() }; }"""
 with sync_playwright() as pw:
     b = pw.chromium.launch(args=ARGS)
-    for w in (1600, 1440, 1366, 1280, 1180, 1024, 900):
-        page = b.new_page(viewport={"width": w, "height": 800})
-        page.goto(URL + "#w=gym:30&rent=3000&bd=1&min=45")
-        page.wait_for_function("window.__stoop && window.__stoop.map()", timeout=120000); page.wait_for_timeout(600)
-        rows = page.evaluate("() => new Set([...document.querySelectorAll('.filters > *')].filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().bottom))).size")
-        print(f"{w}: filter rows (by bottom edge) = {rows}", flush=True)
-        page.screenshot(path=str(OUT / f"top_{w}.png"), clip={"x": 0, "y": 0, "width": w, "height": 140})
-        page.close()
+    for wide in (False, True):
+        for w in (1680, 1512, 1440, 1366, 1280):
+            page = b.new_page(viewport={"width": w, "height": 800})
+            page.goto(URL + "#w=gym:30&rent=3000&bd=1&min=45")
+            page.wait_for_function("window.__stoop && window.__stoop.map()", timeout=120000)
+            if wide: page.add_style_tag(content=".topbar { letter-spacing: .05em; }")
+            page.wait_for_timeout(600)
+            r = page.evaluate(ROW)
+            check(f"{w}{' wide text' if wide else ''}: top bar one row", r["h"] <= 76 and abs(r["dy"]) <= 2, r)
+            page.screenshot(path=str(OUT / f"top_row_{w}{'_wide' if wide else ''}.png"), clip={"x": 0, "y": 0, "width": w, "height": 100})
+            page.close()
     b.close()
+print(f"{sum(res)}/{len(res)} passed")
 raise SystemExit(0 if all(res) else 1)

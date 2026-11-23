@@ -106,6 +106,21 @@ with sync_playwright() as pw:
     hx = page.evaluate("() => window.__stoop.map().getSource('hexes')._data.features.slice(0, 3).map(f => ['i', f.properties.i, f.geometry, 16.5])")
     ins, outs = page.evaluate(SIDE_JS, ["hex-edge", hx])
     check("edges: hex band is on the inside", ins >= 12 and outs <= 1, (ins, outs))
+    # hover: an edge hex (cut to the outline) shows its whole outline, drawn above the neighborhood borders
+    pt = page.evaluate("""() => { const m = window.__stoop.map(), bx = m.getContainer().getBoundingClientRect();
+      for (const f of m.getSource('hexes')._data.features.filter((f) => f.geometry.type === 'MultiPolygon')) {
+        const ring = f.geometry.coordinates[0][0]; let x = 0, y = 0; ring.slice(0, -1).forEach((c) => { x += c[0]; y += c[1]; });
+        const q = m.project([x / (ring.length - 1), y / (ring.length - 1)]);
+        if (q.x > 10 && q.y > 10 && q.x < bx.width - 10 && q.y < bx.height - 10 && m.queryRenderedFeatures(q, { layers: ['hex-fill'] })[0]?.id === f.id)
+          return [q.x + bx.left, q.y + bx.top, f.id]; } return null; }""")
+    if pt:
+        page.mouse.move(pt[0], pt[1]); page.wait_for_timeout(300)
+        hv = page.evaluate("""(id) => { const m = window.__stoop.map(), ids = m.getStyle().layers.map((l) => l.id);
+          return { state: !!m.getFeatureState({ source: 'hexes', id }).hover, above: ids.indexOf('hex-hover') > ids.indexOf('line'),
+                   drawn: m.queryRenderedFeatures({ layers: ['hex-hover'] }).length > 0 }; }""", pt[2])
+        check("hex hover: edge hex outlined above the borders", all(hv.values()), hv)
+    else:
+        check("hex hover: edge hex outlined above the borders", False, "no edge hex on screen")
     page.keyboard.press("Escape"); page.wait_for_timeout(300)
     # remembered after a reload
     page.reload(); ready(page)

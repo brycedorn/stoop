@@ -135,7 +135,8 @@ code { font-family: var(--mono); font-size: 12px; background: var(--wash); paddi
 .brand { display: flex; flex-direction: column; line-height: 1.15; flex: none; }
 .logo { font: 800 22px/1 var(--display); letter-spacing: -.035em; }
 .tagline { font-size: 12px; color: var(--ink-3); }
-.filters { display: flex; align-items: center; gap: 18px; flex: 1; flex-wrap: wrap; }
+.filters { display: flex; align-items: center; gap: 18px; flex: 1; min-width: 0; }
+.filters > * { flex: none; }
 .count { margin: 0 0 0 auto; color: var(--ink-2); font-size: 13px; white-space: nowrap; }
 .count .cl { display: none; }   /* "78 of 197 match": the full wording is in the title */
 .count b { color: var(--ink); font-weight: 650; }
@@ -212,31 +213,26 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
 .dd-menu input:is([type=checkbox], [type=radio]) { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
 
 .filters-toggle { display: none; }
-/* laptops: give the one-row top bar room (brand tagline, slimmer bedroom buttons, radius center in the tooltip) */
-@media (max-width: 1400px) and (min-width: 861px) {
-  .tagline { display: none; }
-  .topbar { gap: 16px; }
-  .filters { gap: 14px; }
-  .seg-row span { min-width: 34px; padding: 0 8px; }
-}
-@media (max-width: 1500px) and (min-width: 861px) {
-  #areaSummary .rc { display: none; }   /* center name stays in the tooltip and the menu */
-}
-@media (max-width: 1280px) and (min-width: 861px) {
-  .topbar .seg-theme span { min-width: 26px; padding: 0 4px; }
-}
-@media (max-width: 1180px) and (min-width: 861px) {
-  .topbar .range { width: 132px; }   /* room for "Max commute" plus "60 min" without touching the next control */
-  .topbar .seg-row span { min-width: 30px; padding: 0 6px; }
-}
+/* The top bar stays one row. When the controls don't fit, app.js (fitTopbar) adds fit1, fit2, fit3 in turn:
+   1: short over-budget label, the radius center's name only in its tooltip and menu
+   2: no tagline, tighter gaps, slimmer bedroom buttons
+   3: narrower sliders, slimmest buttons */
+.topbar.fit1 #areaSummary .rc { display: none; }
+.topbar.fit1 .toggle .t-long { display: none; }
+.topbar.fit1 .toggle .t-short { display: inline; }
+.topbar.fit2 .tagline { display: none; }
+.topbar.fit2 { gap: 16px; }
+.topbar.fit2 .filters { gap: 14px; }
+.topbar.fit2 .seg-row span { min-width: 34px; padding: 0 8px; }
+.topbar.fit2 .seg-theme span { min-width: 26px; padding: 0 4px; }
+.topbar.fit3 .filters > .range { width: 132px; }   /* room for "Max commute" plus "60 min" without touching the next control */
+.topbar.fit3 .seg-row span { min-width: 30px; padding: 0 6px; }
+.topbar.fit3 .filters { gap: 12px; }
+.topbar.fit-wrap .filters { flex-wrap: wrap; row-gap: 8px; }
 .ft-sum { color: var(--ink-2); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; align-self: flex-end; height: 32px; }
 .toggle input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
 .toggle .t-short { display: none; }
-@media (max-width: 1500px) and (min-width: 861px) {
-  .toggle .t-long { display: none; }
-  .toggle .t-short { display: inline; }
-}
 
 /* ---------- side panel ---------- */
 #panel {
