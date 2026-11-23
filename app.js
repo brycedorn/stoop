@@ -43,19 +43,19 @@
   // Match colors: one hue that gets stronger as the match does. Weak matches fade toward the map (each class has its
   // own transparency), strong ones are saturated, so the eye goes to where things fit and "which end is good" needs
   // no legend. One hue, so it reads the same for color-blind viewers. Blended over the basemap land (#f2f2f0 /
-  // #1a1a19) the five steps run one way in OKLab lightness, at least 0.06 apart. Plum is the default because nothing
-  // else on the map is plum (parks are green, water gray, subway lines are thin); indigo and teal are offered too.
+  // #1a1a19) the five steps run one way in OKLab lightness, at least 0.06 apart. Indigo is the default: calm, and
+  // clear of the map's own colors (green parks, gray water); teal and plum are offered too.
   const FADE = { light: [0.42, 0.6, 0.76, 0.9, 1], dark: [0.5, 0.6, 0.68, 0.74, 0.8] };   // on the dark map the strong end is light: kept see-through
   const PALETTE_HEX = {
-    plum: { label: "Plum", light: ["#d9b3e0", "#c38ccd", "#a862b6", "#86409a", "#5e1f75"], dark: ["#6d3a7d", "#8a4d99", "#a967b6", "#c88fd3", "#e6c0ee"] },
     indigo: { label: "Indigo", light: ["#b4c0fb", "#8c9ef2", "#6378e6", "#3f51c9", "#25339b"], dark: ["#2e3a85", "#3f50ad", "#5a6fd6", "#8797f0", "#bcc6fb"] },
     teal: { label: "Teal", light: ["#a6dcd4", "#74c2b7", "#43a397", "#1f8278", "#0b5f58"], dark: ["#185c56", "#1f756d", "#2e968b", "#58b9ac", "#97ddd2"] },
+    plum: { label: "Plum", light: ["#d9b3e0", "#c38ccd", "#a862b6", "#86409a", "#5e1f75"], dark: ["#6d3a7d", "#8a4d99", "#a967b6", "#c88fd3", "#e6c0ee"] },
   };
   const rgba = (hex, a) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(",")},${a})`;
   const PALETTES = Object.fromEntries(Object.entries(PALETTE_HEX).map(([k, p]) =>
     [k, { label: p.label, light: p.light.map((c, i) => rgba(c, FADE.light[i])), dark: p.dark.map((c, i) => rgba(c, FADE.dark[i])) }]));
-  const ramp = () => (PALETTES[state.palette] || PALETTES.plum)[theme()];
-  const solidRamp = () => (PALETTE_HEX[state.palette] || PALETTE_HEX.plum)[theme()];
+  const ramp = () => (PALETTES[state.palette] || PALETTES.indigo)[theme()];
+  const solidRamp = () => (PALETTE_HEX[state.palette] || PALETTE_HEX.indigo)[theme()];
   // "Edges" shading: instead of filling each shape, color a band just inside its outline, so the streets and parks
   // inside stay in plain view and the band can be fully opaque. A line offset by half its width toward the inside
   // draws that band; which side is "inside" follows the ring's direction, so every ring is rewound first
@@ -73,7 +73,13 @@
   const EDGE_W_HOOD = ["interpolate", ["exponential", 1.6], ["zoom"], 9, 2.5, 12, 6, 15, 16, 18, 30];
   const HEX_BAND_M = 10, M_PER_PX_Z0 = 78271.52 * Math.cos((40.7 * Math.PI) / 180);
   const EDGE_W_HEX = ["interpolate", ["exponential", 2], ["zoom"], 12, (HEX_BAND_M / M_PER_PX_Z0) * 2 ** 12, 18, (HEX_BAND_M / M_PER_PX_Z0) * 2 ** 18];
-  const halfOff = (w) => ["interpolate", w[1], w[2], ...w.slice(3).map((x, i) => (i % 2 ? (EDGE_SIDE * x) / 2 : x))];
+  // The band also says how strong the match is: thicker for stronger (more ink draws the eye, as the darker color
+  // does), and a thin dashed band for a very weak match, below WEAK_BELOW on the 0-100 score.
+  const EDGE_K = [0.35, 0.5, 0.66, 0.83, 1], WEAK_BELOW = 40, EDGE_DASH = [2.5, 1.5];   // dashes in band widths
+  const edgeK = (v) => ["step", v, EDGE_K[0], thresholds[0], EDGE_K[1], thresholds[1], EDGE_K[2], thresholds[2], EDGE_K[3], thresholds[3], EDGE_K[4]];
+  // width and offset (half the width, toward the inside) at each zoom stop, scaled by k
+  const edgeWidth = (w, k = 1) => ["interpolate", w[1], w[2], ...w.slice(3).map((x, i) => (i % 2 ? ["*", x, k] : x))];
+  const edgeOffset = (w, k = 1) => ["interpolate", w[1], w[2], ...w.slice(3).map((x, i) => (i % 2 ? ["*", (EDGE_SIDE * x) / 2, k] : x))];
   // How strongly the colors cover the map: full at city zoom, fading as you zoom in so streets, parks and labels
   // show through at street level; the legend's "Fill" slider scales it at any zoom.
   const FILL_BASE = 0.88, FILL_HOVER = 1;
@@ -116,7 +122,7 @@
     boroughs: BOROUGHS.filter((b) => !(META.exclude_boroughs || []).includes(b)),
   });
   const AREA_DEFAULT = { on: false, km: 4.8, lon: null, lat: null };   // km internally; shown in miles
-  const state = { ...defaults(), area: { ...AREA_DEFAULT }, palette: "plum", fill: 1, shade: "fill", colorBy: "total", sort: "match", fixedScale: false, selected: null, hover: null, query: "", tab: "matches", addingDest: false };
+  const state = { ...defaults(), area: { ...AREA_DEFAULT }, palette: "indigo", fill: 1, shade: "fill", colorBy: "total", sort: "match", fixedScale: false, selected: null, hover: null, query: "", tab: "matches", addingDest: false };
   const SORTS = ["match", "rent", "commute", "size"];
   state.boroughs = new Set(state.boroughs);
   // Partner mode: a second set of priorities. Neighborhoods rank by the lower of the two matches ("best for both"),
@@ -164,7 +170,7 @@
       if (SORTS.includes(s.sort)) state.sort = s.sort;
       if (s.area && Number.isFinite(s.area.km)) state.area = { ...AREA_DEFAULT, ...s.area };
       if (typeof s.fixedScale === "boolean") state.fixedScale = s.fixedScale;
-      if (s.palette in PALETTE_HEX) state.palette = s.palette;
+      if (s.colors in PALETTE_HEX) state.palette = s.colors;   // a new key: older saves always held the old default
       if (Number.isFinite(s.fill)) state.fill = Math.min(1, Math.max(0, s.fill));
       if (s.shade === "fill" || s.shade === "edge") state.shade = s.shade;
     }
@@ -299,7 +305,7 @@
       localStorage.setItem(STORE_KEY, JSON.stringify({
         weights: state.people[0].weights, youName: state.people[0].name, partner: partner(), budget: state.budget, bedrooms: state.bedrooms, maxCommute: state.maxCommute,
         showOver: state.showOver, boroughs: [...state.boroughs], colorBy: state.colorBy, sort: state.sort, fixedScale: state.fixedScale, area: state.area,
-        palette: state.palette, fill: state.fill, shade: state.shade,
+        colors: state.palette, fill: state.fill, shade: state.shade,
         excludeSeen: JSON.stringify(META.exclude_boroughs || []),
       }));
       localStorage.setItem(SHORT_KEY, JSON.stringify(shortlist));
@@ -1317,9 +1323,13 @@
     const banded = state.fixedScale || vis.length < 10;   // too few matches to split into fifths
     const lo = banded ? [0, ...thresholds] : [Math.min(...vis), ...thresholds];
     const ticks = lo.map((v) => Math.round(v));
-    const html = `<div class="swatches">${cols.map((c) => `<span style="background:${c}"></span>`).join("")}</div>
+    // Edges mode: the swatches are bands as thick as the map draws them, and a note says what dashed means
+    const edge = state.shade === "edge", solid = solidRamp();
+    const html = `<div class="swatches${edge ? " as-bands" : ""}">${cols.map((c, i) => edge
+        ? `<span style="background:${solid[i]};height:${Math.round(10 * EDGE_K[i] * 2) / 2}px"></span>` : `<span style="background:${c}"></span>`).join("")}</div>
       <div class="ticks">${ticks.map((t) => `<span>${t}+</span>`).join("")}</div>
       <div class="ends" aria-hidden="true"><span>weaker</span><span>stronger match</span></div>
+      ${edge ? `<div class="edge-note"><span class="dash" style="--c:${solid[0]}"></span>Dashed: under ${WEAK_BELOW}, a weak match</div>` : ""}
       <div class="legend-foot"><span>${banded ? "20-point bands" : "Fifths of your matches"}</span>
         <label title="Keep each shade's meaning fixed while you filter"><input type="checkbox" id="fixedScale" ${state.fixedScale ? "checked" : ""}>Fixed scale</label></div>
       <div class="legend-look">
@@ -1890,8 +1900,9 @@
     addContextUnder(firstLabel, dark);
     addHexLayers(firstLabel, dark);
     // edges shading: a band inside each neighborhood's outline (see EDGE_SIDE)
-    map.addLayer({ id: "edge", type: "line", source: "hoods", layout: { "line-join": "round" }, paint: {
-      "line-color": "rgba(0,0,0,0)", "line-opacity": 0, "line-width": EDGE_W_HOOD, "line-offset": halfOff(EDGE_W_HOOD) } }, firstLabel);
+    for (const [id, dash] of [["edge", null], ["edge-weak", EDGE_DASH]])
+      map.addLayer({ id, type: "line", source: "hoods", layout: { "line-join": "round" }, paint: { ...(dash && { "line-dasharray": dash }),
+        "line-color": "rgba(0,0,0,0)", "line-opacity": 0, "line-width": edgeWidth(EDGE_W_HOOD), "line-offset": edgeOffset(EDGE_W_HOOD) } }, firstLabel);
     map.addLayer({ id: "line", type: "line", source: "hoods", paint: {
       "line-color": ["case", ["boolean", ["feature-state", "on"], false], dark ? "#1a1a19" : "#ffffff", dark ? "#55544f" : "#b4b2aa"],
       "line-width": ["case", ["boolean", ["feature-state", "on"], false], 0.9, 0.6],
@@ -1944,7 +1955,7 @@
     { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-count", "gyms-sel", "gyms-sel-ring"] },
     { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
     { id: "airports", label: "Airports", has: () => L.airports?.length, layers: ["airports", "airports-hover", "airport-codes"] },
-    { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-edge", "hex-line", "hex-hover"] },
+    { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-edge", "hex-edge-weak", "hex-line", "hex-hover"] },
   ];
   let layerOn = Object.fromEntries(CONTEXT.map((c) => [c.id, true]));
   try { Object.assign(layerOn, JSON.parse(localStorage.getItem(LAYER_KEY) || "{}")); } catch (e) {}
@@ -2438,7 +2449,7 @@
     if (!map || !styleReady || !map.getSource("hexes")) return;
     map.getSource("hexes").setData(hexData());
     hexShown = state.selected;
-    map.setPaintProperty("hex-fill", "fill-color", hexFillColor()); if (map.getLayer("hex-edge")) map.setPaintProperty("hex-edge", "line-color", hexFillColor(true));
+    map.setPaintProperty("hex-fill", "fill-color", hexFillColor()); paintEdges();
   }
   function hexFillColor(solid = false) {
     const c = solid ? solidRamp() : ramp(), v = ["get", "v"];
@@ -2451,8 +2462,9 @@
     if (!map.getSource("hexes")) map.addSource("hexes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({ id: "hex-fill", type: "fill", source: "hexes", paint: { "fill-color": "rgba(0,0,0,0)",
       "fill-opacity": fillOpacity(["get", "few"]) } }, beforeId);
-    map.addLayer({ id: "hex-edge", type: "line", source: "hexes", layout: { "line-join": "miter" }, paint: {
-      "line-color": "rgba(0,0,0,0)", "line-opacity": 0, "line-width": EDGE_W_HEX, "line-offset": halfOff(EDGE_W_HEX) } }, beforeId);
+    for (const [id, dash] of [["hex-edge", null], ["hex-edge-weak", EDGE_DASH]])
+      map.addLayer({ id, type: "line", source: "hexes", layout: { "line-join": "miter" }, paint: { ...(dash && { "line-dasharray": dash }),
+        "line-color": "rgba(0,0,0,0)", "line-opacity": 0, "line-width": edgeWidth(EDGE_W_HEX), "line-offset": edgeOffset(EDGE_W_HEX) } }, beforeId);
     map.addLayer({ id: "hex-line", type: "line", source: "hexes", paint: {
       "line-color": dark ? "#1a1a19" : "#ffffff", "line-width": 0.6, "line-opacity": 0.7 } }, beforeId);
   }
@@ -2590,16 +2602,27 @@
     if (!map || !styleReady) return;
     if (map.getLayer("fill")) { map.setPaintProperty("fill", "fill-color", fillExpression()); map.setPaintProperty("fill", "fill-opacity", fillOpacity()); }
     if (map.getLayer("hex-fill")) { map.setPaintProperty("hex-fill", "fill-color", hexFillColor()); map.setPaintProperty("hex-fill", "fill-opacity", fillOpacity(["get", "few"])); }
-    const edge = state.shade === "edge";
-    if (map.getLayer("edge")) {
-      map.setPaintProperty("edge", "line-color", fillExpression(true));
-      // the open neighborhood's own band would sit on its hexes: they show the detail instead
-      map.setPaintProperty("edge", "line-opacity", edge ? ["case", ["boolean", ["feature-state", "sel"], false], HX ? 0 : state.fill, state.fill] : 0);
-    }
-    if (map.getLayer("hex-edge")) {
-      map.setPaintProperty("hex-edge", "line-color", hexFillColor(true));
-      map.setPaintProperty("hex-edge", "line-opacity", edge ? ["case", ["get", "few"], 0.4 * state.fill, state.fill] : 0);
-    }
+    paintEdges();
+  }
+  // The edges bands: color, width and solid or dashed all follow the match classes, so this runs whenever they move.
+  // Each band is two layers (solid, and dashed for very weak matches): this MapLibre can't vary the dash per shape.
+  function paintEdges() {
+    if (!map || !styleReady) return;
+    const edge = state.shade === "edge", k = state.fill;
+    const set = (ids, color, v, w, extra) => {
+      if (!map.getLayer(ids[0])) return;
+      const weak = ["all", [">=", v, 0], ["<", v, WEAK_BELOW]];
+      ids.forEach((id, dashed) => {
+        map.setPaintProperty(id, "line-color", color);
+        map.setPaintProperty(id, "line-width", edgeWidth(w, edgeK(v)));
+        map.setPaintProperty(id, "line-offset", edgeOffset(w, edgeK(v)));
+        map.setPaintProperty(id, "line-opacity", edge ? ["*", ["case", ...extra, k], ["case", weak, dashed, 1 - dashed]] : 0);
+      });
+    };
+    // the open neighborhood's own band would sit on its hexes: they show the detail instead
+    set(["edge", "edge-weak"], fillExpression(true), ["coalesce", ["feature-state", "v"], -1], EDGE_W_HOOD,
+      [["boolean", ["feature-state", "sel"], false], HX ? 0 : k]);
+    set(["hex-edge", "hex-edge-weak"], hexFillColor(true), ["get", "v"], EDGE_W_HEX, [["get", "few"], 0.4 * k]);
   }
   function fillExpression(solid = false) {
     const c = solid ? solidRamp() : ramp();
@@ -2618,7 +2641,7 @@
       map.setFeatureState({ source: "hoods", id: r.id }, { v: v == null ? -1 : v, on: r.visible, sel: r.id === state.selected,
         short: shortlist.includes(r.id) });
     }
-    map.setPaintProperty("fill", "fill-color", fillExpression()); if (map.getLayer("edge")) map.setPaintProperty("edge", "line-color", fillExpression(true));   // classes moved: the edge band follows
+    map.setPaintProperty("fill", "fill-color", fillExpression()); paintEdges();   // classes moved: the edge bands follow
     renderHexes();
     applyBoroughFilter(all);
     renderPins(all);
