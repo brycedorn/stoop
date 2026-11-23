@@ -344,6 +344,25 @@ details.how li + li { margin-top: 4px; }
 .ranking .divider small { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 11.5px; }
 
 /* priorities */
+/* ---------- partner mode ---------- */
+.people { margin: 0 2px 14px; display: grid; gap: 8px; }
+.people .ts { margin: 0; }
+.who { display: inline-flex; background: var(--wash); border-radius: var(--radius-sm); padding: 2px; justify-self: start; }
+.who button {
+  border: 0; background: none; height: 30px; padding: 0 14px; border-radius: 5px; font: inherit; font-size: 13px;
+  color: var(--ink-2); cursor: pointer; transition: background-color .15s, color .15s;
+}
+.who button[aria-pressed="true"] { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.who button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.who-edit { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
+.who-edit label { display: grid; gap: 3px; font-size: 11px; color: var(--ink-3); font-weight: 550; }
+.who-edit input, .who-edit select { height: 32px; font: inherit; font-size: 13px; color: var(--ink); min-width: 0; }
+.who-edit input { width: 9em; }
+.ranking .score .both { display: block; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranking .score .both:empty { display: none; }
+.d-both { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+.d-both b { font-family: var(--display); color: var(--ink); font-size: 15px; }
+.d-both .n { color: var(--ink-3); font-size: 12px; }
 .presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 2px 16px; }
 .presets button {
   border: 1px solid var(--border); background: var(--raised); border-radius: 999px; height: 30px; padding: 0 12px;
@@ -431,12 +450,15 @@ details.how li + li { margin-top: 4px; }
 .sw-airports { border-radius: 50%; background: #3d3c39; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
 .sw-grocery { border-radius: 50%; background: #008300; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
 .sw-gyms { border-radius: 50%; background: #6250d6; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
+.sw-dogs { border-radius: 50%; background: #8a5a2b; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
 .sw-places { border-radius: 50%; background: #d55181; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
 :root[data-theme="dark"] .sw-gyms { background: #9085e9; }
 :root[data-theme="dark"] .sw-places { background: #e87ba4; }
+:root[data-theme="dark"] .sw-dogs { background: #c08a56; }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) .sw-gyms { background: #9085e9; }
   :root:where(:not([data-theme="light"])) .sw-places { background: #e87ba4; }
+  :root:where(:not([data-theme="light"])) .sw-dogs { background: #c08a56; }
 }
 .sw-out { width: 16px; height: 11px; border: 1px solid var(--rule); border-radius: 2px; }
 .sw-short { width: 16px; height: 11px; border: 1.5px dashed var(--ink); border-radius: 2px; background: var(--wash); }
@@ -568,6 +590,7 @@ body:has(#detail:not([hidden])) :is(.maplibregl-ctrl-top-right, .maplibregl-ctrl
 /* the two must-haves read as a plain stat row, not cards inside the card */
 .facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 4px; padding-top: 12px; border-top: 1px solid var(--hair); }
 .fact { padding: 0; }
+.fact.wide { grid-column: 1 / -1; }
 .fact .k { font-size: 11px; color: var(--ink-3); font-weight: 550; }
 .fact .v { font-family: var(--display); font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }   /* one value: proportional figures (the tabular comma leaves gaps) */
 .fact .n { font-size: 11px; color: var(--ink-3); }
