@@ -1431,7 +1431,7 @@
     map.on("style.load", addLayers);
     map.on("zoom", syncGroups);
     map.on("styleimagemissing", (e) => {
-      if (e.id.startsWith("rbs:") && !map.hasImage(e.id)) map.addImage(e.id, bulletsImage(e.id.slice(4)));
+      if (e.id.startsWith("rbs:") && !map.hasImage(e.id)) addMapImage(e.id, bulletsImage(e.id.slice(4)));
     });
     // One hover handler: a point (station, bus stop, grocery, your place) wins over the neighborhood under it.
     // Mice can fire mousemove several times per frame; only the latest position each frame is worth querying.
@@ -1758,6 +1758,9 @@
           "line-width": ["interpolate", ["linear"], ["zoom"], 11, 2.5, 15, 4.5, 17, 6] } }, beforeId);
   }
 
+  // Our icons are drawn at 2x on high-density screens. MapLibre takes the pixel ratio as an option, not as a
+  // field of the image: without it a 2x image shows at double size (huge icons on Retina displays).
+  const addMapImage = (id, im) => map.addImage(id, { width: im.width, height: im.height, data: im.data }, { pixelRatio: im.pixelRatio });
   // Icon badge: colored disc, white ring, white factor icon (same icon as the factor tag)
   function badgeImage(iconKey, color, px = 28) {
     const r = window.devicePixelRatio > 1 ? 2 : 1, s = px * r, c = document.createElement("canvas");
@@ -1903,7 +1906,7 @@
         paint: { "text-color": ink2, "text-halo-color": halo, "text-halo-width": 1.6 } });
     if (L.bus?.length) {
       addGroupedSource("bus-stops");
-      if (!map.hasImage("badge-bus")) map.addImage("badge-bus", badgeImage("bus", dark ? "#6f6d68" : "#52514e"));
+      if (!map.hasImage("badge-bus")) addMapImage("badge-bus", badgeImage("bus", dark ? "#6f6d68" : "#52514e"));
       const bus = { id: "bus-stops", type: "symbol", source: "bus-stops", minzoom: 14,
         layout: { "icon-image": "badge-bus", "icon-allow-overlap": true, "icon-ignore-placement": true,
           "icon-size": ["interpolate", ["linear"], ["zoom"], 14, 0.5, 17, 0.8] } };
@@ -1940,7 +1943,7 @@
     ];
     for (const [id, iconKey, minzoom] of badges) {
       if (!GROUPED[id].rows()?.length) continue;
-      if (!map.hasImage("badge-" + id)) map.addImage("badge-" + id, badgeImage(iconKey, markerColor(id)));
+      if (!map.hasImage("badge-" + id)) addMapImage("badge-" + id, badgeImage(iconKey, markerColor(id)));
       addGroupedSource(id);
       const lyr = { id, type: "symbol", source: id, minzoom,
         layout: { "icon-image": "badge-" + id, "icon-allow-overlap": true, "icon-ignore-placement": true,
@@ -1967,7 +1970,7 @@
     renderAirRoute();
     // Airports: a larger neutral badge (plane icon) with its code, visible at every zoom
     if (L.airports?.length) {
-      if (!map.hasImage("badge-airports")) map.addImage("badge-airports", badgeImage("airports", dark ? "#6f6d68" : "#3d3c39", 34));
+      if (!map.hasImage("badge-airports")) addMapImage("badge-airports", badgeImage("airports", dark ? "#6f6d68" : "#3d3c39", 34));
       map.addSource("airports", { type: "geojson", generateId: true,
         data: pointsFC(L.airports, (r) => ({ kind: "airport", name: r[2], key: r[3] })) });
       const ap = { id: "airports", type: "symbol", source: "airports",
