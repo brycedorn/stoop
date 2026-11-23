@@ -66,15 +66,15 @@ with sync_playwright() as pw:
     page.goto(URL + "rank.html"); page.evaluate("() => localStorage.clear()")
     page.goto(URL); ready(page)
     page.evaluate(f"() => {S}.map().jumpTo({{center: [-73.93, 40.715], zoom: 11}})"); page.wait_for_timeout(800); idle(page)
-    check("default palette is plum", page.get_attribute('#legend [data-pal="plum"]', "aria-checked") == "true")
+    check("default palette is indigo", page.get_attribute('#legend [data-pal="indigo"]', "aria-checked") == "true")
     expr = str(page.evaluate("() => window.__stoop.map().getPaintProperty('fill', 'fill-color')"))
-    check("map uses the plum colors", "134,64,154" in expr)   # #86409a, the fourth step
-    page.screenshot(path=str(OUT / "colors_plum_z11.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
+    check("map uses the indigo colors", "63,81,201" in expr)   # #3f51c9, the fourth step
+    page.screenshot(path=str(OUT / "colors_indigo_z11.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
     # fades with zoom
     o11, o16 = opacity_at(page, 11), opacity_at(page, 16)
     check("colors fade at street level", o16 < o11 * 0.6, (round(o11, 2), round(o16, 2)))
     page.evaluate(f"() => {S}.map().jumpTo({{center: [-73.985, 40.74], zoom: 15.5}})"); page.wait_for_timeout(800); idle(page)
-    page.screenshot(path=str(OUT / "colors_plum_z15.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
+    page.screenshot(path=str(OUT / "colors_indigo_z15.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
     # switch palette
     page.click('#legend [data-pal="teal"]'); page.wait_for_timeout(400)
     expr = str(page.evaluate("() => window.__stoop.map().getPaintProperty('fill', 'fill-color')"))
@@ -96,6 +96,13 @@ with sync_playwright() as pw:
     check("edges: no fill inside the shapes", st["fill"].endswith(",0.22,0]"), st["fill"])
     check("edges: band drawn at the fill strength", "0.3" in st["edge"], st["edge"])
     check("edges: band offset to one side", '"zoom"' in st["off"], st["off"][:60])
+    # the band's width follows the match (thicker = stronger) and very weak matches get a dashed band
+    wk = page.evaluate("""() => { const m = window.__stoop.map();
+      return { w: JSON.stringify(m.getPaintProperty('edge', 'line-width')), dash: m.getPaintProperty('edge-weak', 'line-dasharray'),
+               weak: m.queryRenderedFeatures({ layers: ['edge-weak'] }).length, note: !!document.querySelector('#legend .edge-note'),
+               bands: [...document.querySelectorAll('#legend .swatches.as-bands span')].map((s) => s.getBoundingClientRect().height) }; }""")
+    check("edges: width follows the match", '"step"' in wk["w"] and wk["bands"] == sorted(wk["bands"]) and wk["bands"][0] < wk["bands"][-1], wk["bands"])
+    check("edges: weak matches dashed", bool(wk["dash"]) and wk["weak"] > 0 and wk["note"], (wk["dash"], wk["weak"]))
     chip = page.evaluate("() => { const b = document.querySelector('#legend [data-pal]').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }")
     check("palette chips are rounded rectangles", chip[0] > chip[1], chip)
     page.screenshot(path=str(OUT / "colors_edges.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
