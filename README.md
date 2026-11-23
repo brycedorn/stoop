@@ -96,7 +96,23 @@ stoop/               pipeline (python -m stoop)
 web/                 static map (open index.html)
 inputs/              your personal data
 data/                downloads + intermediate results (gitignored)
+tests/               unit tests (pytest); tests/browser/ drives the page in a real browser
 ```
+
+## Tests
+
+`pytest` runs the unit tests: no network, no geopandas, a few seconds.
+
+The browser suites in `tests/browser/` click through the page itself: partner mode, the ranking page, the
+dropdowns at several screen widths. They need Playwright (`pip install playwright`, then
+`playwright install chromium`) and built data in `web/data`. The runner serves `web/` itself:
+
+```
+python tests/browser/run.py            # every suite (several minutes: the map renders in software)
+python tests/browser/run.py e2e menus  # just these
+```
+
+Screenshots land in `tests/browser/shots/` (gitignored), for a look by eye.
 
 ## Publishing (optional, free)
 

@@ -32,3 +32,6 @@ site/
 # planning docs live in ../stoop-planning; agent notes and local tool settings stay untracked
 CLAUDE.md
 .claude/
+
+# browser test screenshots (tests/browser/run.py)
+tests/browser/shots/
