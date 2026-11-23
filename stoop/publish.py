@@ -30,7 +30,7 @@ log = logging.getLogger("stoop.publish")
 
 RENT_BAND = 500
 RESTRICTED_NAMES = ["listings"]   # plus config.local.yaml `publish.never_name`: sources the site must never name
-SITE_FILES = ["index.html", "app.js", "factors.js", "rank.html", "rank.js", "style.css", "fonts/schibsted-grotesk-latin.woff2", "fonts/OFL.txt"]
+SITE_FILES = ["index.html", "app.js", "factors.js", "rank.html", "rank.js", "style.css", "favicon.svg", "fonts/schibsted-grotesk-latin.woff2", "fonts/OFL.txt"]
 PERSONAL_COLUMNS = {"familiar_dist_m", "fav_score", "fav_within_walk", "activity_density",
                     "listings_now", "listings_area"}   # the last two: listing counts, local only
 PERSONAL_LAYERS = ("places",)

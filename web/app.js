@@ -85,8 +85,8 @@
   const FILL_BASE = 0.88, FILL_HOVER = 1;
   function fillOpacity(extra = null) {
     const hov = ["boolean", ["feature-state", "hover"], false];
-    if (state.shade === "edge") return ["case", hov, 0.22, 0];   // a light wash only under the pointer
-    const k = state.fill;
+    if (state.shade === "edge") return ["case", hov, 0.22 * veil, 0];   // a light wash only under the pointer
+    const k = state.fill * veil;
     const at = (f) => ["*", k * f, extra ? ["case", hov, FILL_HOVER, extra, 0.35, FILL_BASE] : ["case", hov, FILL_HOVER, FILL_BASE]];
     return ["interpolate", ["linear"], ["zoom"], 12, at(1), 13.5, at(0.7), 15, at(0.45), 17, at(0.3)];
   }
@@ -150,6 +150,18 @@
     name: d.label || d.name || `Destination ${i + 1}`, lat: +d.lat, lon: +d.lon, weight: d.weight ?? 1, on: i === ACTIVE0 }));
   const setActive = (i) => dests.forEach((d, j) => { d.on = j === i; });
   let dests = configDests();
+  // First visit: a short guide (what stoop does, rank your priorities, then the matches appear). Shown once, and
+  // never to someone who already has saved settings or who arrives through a shared link.
+  const INTRO_KEY = "stoop.intro.v1";
+  const firstVisit = (() => {
+    try {
+      const seen = localStorage.getItem(INTRO_KEY);
+      // "pending": started and left halfway (a reload carries this page's own ranking in the address, not a shared link)
+      return seen === "pending" || (seen !== "done" && !localStorage.getItem(STORE_KEY) && !/(^|[#&])(w|add)=/.test(location.hash));
+    } catch (e) { return false; }
+  })();
+  // How much of the match colors show (0-1): 0 while the guide holds them back, then it fades them in
+  let veil = firstVisit ? 0 : 1;
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (s) {
@@ -2608,7 +2620,7 @@
   // Each band is two layers (solid, and dashed for very weak matches): this MapLibre can't vary the dash per shape.
   function paintEdges() {
     if (!map || !styleReady) return;
-    const edge = state.shade === "edge", k = state.fill;
+    const edge = state.shade === "edge", k = state.fill * veil;
     const set = (ids, color, v, w, extra) => {
       if (!map.getLayer(ids[0])) return;
       const weak = ["all", [">=", v, 0], ["<", v, WEAK_BELOW]];
@@ -2774,7 +2786,8 @@
       e.preventDefault(); setTab("matches"); $("search").focus(); return;
     }
     if (e.key !== "Escape") return;
-    if (state.pickingArea) setAreaPickMode(false);
+    if (intro.step) endIntro();
+    else if (state.pickingArea) setAreaPickMode(false);
     else if (state.addingDest) setAddMode(false);
     else if (!$("compare").hidden) closeCompare();
     else if (state.marker) clearMarker();
@@ -2838,5 +2851,89 @@
     clearTimeout($("copyMsg")._t);
     $("copyMsg")._t = setTimeout(() => { $("copyMsg").hidden = true; }, 5000);
   };
-  window.__stoop = { state, results: () => results, update, map: () => map };   // for debugging in the console
+  // ---------- the first-visit guide ----------
+  // Three steps: what stoop does (over a map with no colors yet), rank your priorities (the list is lifted above a
+  // dimmed page), then the colors fade in with a note on how to read them. "How it works" in the panel replays it.
+  const intro = { step: null };
+  function fadeVeil(to, ms) {
+    const from = veil, t0 = performance.now(), dur = motionMs(ms);
+    cancelAnimationFrame(fadeVeil.raf);
+    const tick = (t) => {
+      const p = dur ? Math.min(1, (t - t0) / dur) : 1;
+      veil = from + (to - from) * (1 - (1 - p) ** 3);
+      paintMatchColors();
+      if (p < 1) fadeVeil.raf = requestAnimationFrame(tick);
+    };
+    fadeVeil.raf = requestAnimationFrame(tick);
+  }
+  const mark = () => document.querySelector(".brand .mark").outerHTML;
+  function showIntro(step) {
+    intro.step = step;
+    const box = $("intro"), held = step === "welcome" || step === "priorities";
+    document.body.classList.toggle("intro-held", held);
+    document.body.classList.toggle("intro-prio", step === "priorities");
+    $("introScrim").hidden = !held;
+    // what's dimmed can't be tabbed into either
+    document.querySelector(".topbar").inert = held;
+    $("panel").inert = step === "welcome";
+    for (const el of document.querySelectorAll("#map, .map-tools, .legend-card")) el.inert = held;
+    box.hidden = !step;
+    box.dataset.step = step || "";
+    if (!step) return;
+    try { localStorage.setItem(INTRO_KEY, "pending"); } catch (e) {}
+    const where = MOBILE() ? "below" : "on the left";
+    const ramp = `<span class="intro-ramp" aria-hidden="true"></span>`;
+    if (step === "welcome") {
+      box.setAttribute("aria-modal", "true");
+      box.innerHTML = `<div class="intro-head">${mark()}<span class="logo">stoop</span></div>
+        <h2 id="introTitle" tabindex="-1">Find the NYC neighborhood that fits you</h2>
+        <p>stoop scores every neighborhood in the city on what you care about, like rent, your commute, parks and quiet
+          streets, then colors the map by how well each one fits.</p>
+        <ol class="intro-steps">
+          <li><b>Rank what matters.</b> Your order sets the score.</li>
+          <li><b>See your matches.</b> ${ramp} The darker, the better the fit.</li>
+          <li><b>Dig in.</b> Open a neighborhood for its numbers; star the ones to compare.</li>
+        </ol>
+        <div class="intro-actions"><button class="btn primary" type="button" data-go="priorities">Rank my priorities</button>
+          <button class="btn ghost" type="button" data-go="skip">Skip to the map</button></div>`;
+    } else if (step === "priorities") {
+      box.setAttribute("aria-modal", "false");
+      setTab("priorities");
+      box.innerHTML = `<p class="intro-of">Step 1 of 2</p>
+        <h2 id="introTitle" tabindex="-1">What matters most to you?</h2>
+        <p>Drag the list ${where} into order, most important at the top. Anything below the line doesn't count.
+          A preset is a quick start.</p>
+        <div class="intro-actions"><button class="btn primary" type="button" data-go="reveal">Show my matches</button>
+          <button class="btn ghost" type="button" data-go="welcome">Back</button></div>`;
+      if (MOBILE()) $("panel").scrollIntoView({ behavior: motionMs(1) ? "smooth" : "auto" });
+    } else {
+      box.setAttribute("aria-modal", "false");
+      setTab("matches");
+      fadeVeil(1, 1100);
+      if (!MOBILE()) $("fitBtn").onclick();
+      else window.scrollTo({ top: 0, behavior: motionMs(1) ? "smooth" : "auto" });
+      const n = results.filter((r) => r.rank).length;
+      box.innerHTML = `<p class="intro-of">Step 2 of 2</p>
+        <h2 id="introTitle" tabindex="-1">${n ? `${fmtInt(n)} neighborhood${n === 1 ? "" : "s"} fit` : "Nothing fits the must-haves yet"}</h2>
+        <p>${ramp} The darker, the better the match. ${MOBILE()
+          ? "Tap a neighborhood for its full breakdown. Bedrooms, rent and commute limits are under Filters at the top."
+          : "Hover a neighborhood for its scores, click it for the full breakdown. Bedrooms, rent and commute limits are in the bar up top."}</p>
+        <div class="intro-actions"><button class="btn primary" type="button" data-go="done">Start exploring</button></div>`;
+    }
+    box.querySelector("h2").focus({ preventScroll: true });
+  }
+  function endIntro() {
+    if (veil < 1) fadeVeil(1, 500);
+    showIntro(null);
+    try { localStorage.setItem(INTRO_KEY, "done"); } catch (e) {}
+  }
+  $("intro").onclick = (e) => {
+    const go = e.target.closest("[data-go]")?.dataset.go;
+    if (go === "skip" || go === "done") endIntro();
+    else if (go) showIntro(go);
+  };
+  $("introReplay").onclick = () => { fadeVeil(0, 300); showIntro("welcome"); };
+  if (firstVisit) showIntro("welcome");
+
+  window.__stoop = { state, results: () => results, update, map: () => map, intro: () => intro.step, veil: () => veil };   // for debugging in the console
 })();

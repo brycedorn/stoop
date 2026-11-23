@@ -2,13 +2,13 @@
 import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from common import ARGS, OUT, URL
+from common import ARGS, OUT, URL, context
 res, errs = [], []
 def check(name, ok, detail=""):
     res.append(bool(ok)); print(("PASS " if ok else "FAIL ") + name + (f"  [{detail}]" if detail != "" else ""), flush=True)
 with sync_playwright() as pw:
     b = pw.chromium.launch(args=ARGS)
-    ctx = b.new_context(viewport={"width": 1440, "height": 900}, permissions=["clipboard-read", "clipboard-write"])
+    ctx = context(b, viewport={"width": 1440, "height": 900}, permissions=["clipboard-read", "clipboard-write"])
     # you: set up a known ranking first
     me = ctx.new_page(); me.on("pageerror", lambda e: errs.append(str(e)))
     me.goto(URL); me.evaluate("() => localStorage.clear()")
@@ -21,7 +21,7 @@ with sync_playwright() as pw:
     inv = me.evaluate("() => navigator.clipboard.readText()")
     check("invite link points at the ranking page", "rank.html" in inv, inv)
     # partner: the ranking page, on a phone-sized screen
-    ph = b.new_context(viewport={"width": 390, "height": 844}, permissions=["clipboard-read", "clipboard-write"]).new_page()
+    ph = context(b, viewport={"width": 390, "height": 844}, permissions=["clipboard-read", "clipboard-write"]).new_page()
     ph.on("pageerror", lambda e: errs.append(str(e)))
     ph.goto(URL + "rank.html#from=Alex"); ph.wait_for_timeout(1000)
     check("page says who asked", "Alex" in ph.inner_text("#lede"))

@@ -22,7 +22,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 WEB = HERE.parent.parent / "web"
-SUITES = ["feat", "invite", "e2e", "menus", "colors"]
+SUITES = ["feat", "invite", "e2e", "menus", "colors", "intro"]
 
 
 def free_port() -> int:

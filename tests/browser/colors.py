@@ -1,6 +1,6 @@
 """Match colors: the palette switch, the fill slider, both remembered, and the fade as you zoom in to street level."""
 from playwright.sync_api import sync_playwright
-from common import ARGS, OUT, URL
+from common import ARGS, OUT, URL, context
 
 S = "window.__stoop"
 res, errs = [], []
@@ -60,7 +60,7 @@ def opacity_at(page, z):
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(args=ARGS)
-    ctx = b.new_context(viewport={"width": 1440, "height": 900})
+    ctx = context(b, viewport={"width": 1440, "height": 900})
     page = ctx.new_page()
     page.on("pageerror", lambda e: errs.append(str(e)))
     page.goto(URL + "rank.html"); page.evaluate("() => localStorage.clear()")
@@ -159,7 +159,7 @@ with sync_playwright() as pw:
     check("hexes use the same palette", "rgba(" in hexc and ("135,151,240" in hexc if dark == "dark" else "63,81,201" in hexc), dark)
     page.screenshot(path=str(OUT / "colors_indigo_dark_hexes.png"))
     # phone: the legend controls fit
-    ph = b.new_context(viewport={"width": 390, "height": 844}).new_page()
+    ph = context(b, viewport={"width": 390, "height": 844}).new_page()
     ph.on("pageerror", lambda e: errs.append(str(e)))
     ph.goto(URL); ready(ph)
     fits = ph.evaluate("() => { const l = document.querySelector('.legend-look'); if (!l) return 'missing'; const r = l.getBoundingClientRect(); return r.right <= innerWidth && l.scrollWidth <= l.clientWidth + 1; }")

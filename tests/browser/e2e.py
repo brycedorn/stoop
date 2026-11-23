@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from common import ARGS, OUT, URL
+from common import ARGS, OUT, URL, context
 S = "window.__stoop"
 res, errs = [], []
 
@@ -36,7 +36,7 @@ def people_txt(p):
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(args=ARGS)
-    ctx = b.new_context(viewport={"width": 1440, "height": 900}, permissions=["clipboard-read", "clipboard-write"])
+    ctx = context(b, viewport={"width": 1440, "height": 900}, permissions=["clipboard-read", "clipboard-write"])
 
     # 1. returned link: import, note, rename clears note, remove clears note
     me = open_(ctx, URL + "#w=gym:30,commute:20&rent=4000&bd=1&min=50", clear=True)
@@ -115,7 +115,7 @@ with sync_playwright() as pw:
     # 6. partner link to a fresh browser
     me.click("#tab-priorities"); me.click("#copyLink"); me.wait_for_timeout(300)
     link = me.evaluate("() => navigator.clipboard.readText()")
-    ctx2 = b.new_context(viewport={"width": 1440, "height": 900})
+    ctx2 = context(b, viewport={"width": 1440, "height": 900})
     p2 = open_(ctx2, link)
     check("partner link: two people in a fresh browser", st(p2, f"{S}.state.people.length") == 2)
     top = f"JSON.stringify({S}.results().slice(0,5).map(r => r.id))"
@@ -125,7 +125,7 @@ with sync_playwright() as pw:
     # 7. invite round trip with a hostile name
     me.click("#invite"); me.wait_for_timeout(300)
     inv = me.evaluate("() => navigator.clipboard.readText()")
-    phctx = b.new_context(viewport={"width": 390, "height": 844}, permissions=["clipboard-read", "clipboard-write"])
+    phctx = context(b, viewport={"width": 390, "height": 844}, permissions=["clipboard-read", "clipboard-write"])
     ph = open_(phctx, inv)
     ph.fill("#name", "<img src=x onerror=alert(1)>Bob"); ph.click("#send"); ph.wait_for_timeout(300)
     ret = ph.input_value("#sendLink")
@@ -149,7 +149,7 @@ with sync_playwright() as pw:
     p.close()
 
     # 10. phone, dark theme
-    dctx = b.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
+    dctx = context(b, viewport={"width": 390, "height": 844}, color_scheme="dark")
     p = open_(dctx, back); p.wait_for_timeout(500)
     p.screenshot(path=str(OUT / "phone_import_dark.png"))
     check("phone: partner bar fits", p.evaluate("() => { const e = document.getElementById('people'); return e.scrollWidth <= e.clientWidth + 1; }"))

@@ -1,7 +1,7 @@
 """Dog runs, the rental card, partner mode basics, the partner link and old 5K links."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from common import ARGS, OUT, URL
+from common import ARGS, OUT, URL, context
 res, errs = [], []
 def check(name, ok, detail=""):
     res.append(bool(ok)); print(("PASS " if ok else "FAIL ") + name + (f"  [{detail}]" if detail != "" else ""), flush=True)
@@ -10,7 +10,7 @@ def ready(page):
     page.wait_for_timeout(1200)
 with sync_playwright() as pw:
     b = pw.chromium.launch(args=ARGS)
-    ctx = b.new_context(viewport={"width": 1440, "height": 900}, permissions=["clipboard-read", "clipboard-write"])
+    ctx = context(b, viewport={"width": 1440, "height": 900}, permissions=["clipboard-read", "clipboard-write"])
     page = ctx.new_page()
     page.on("pageerror", lambda e: errs.append(str(e)))
     # clear storage from another page, then load the map fresh (changing only the hash would make the app reload itself)

@@ -1,14 +1,14 @@
 """Top-bar dropdowns and the Reset button at several screen widths."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from common import ARGS, OUT, URL
+from common import ARGS, OUT, URL, context
 res = []
 def check(name, ok, detail=""):
     res.append(bool(ok)); print(("PASS " if ok else "FAIL ") + name + (f"  [{detail}]" if detail != "" else ""), flush=True)
 with sync_playwright() as pw:
     b = pw.chromium.launch(args=ARGS)
     for w, h in ((1440, 900), (1280, 800), (1024, 768), (390, 844)):
-        page = b.new_page(viewport={"width": w, "height": h})
+        page = context(b, viewport={"width": w, "height": h}).new_page()
         page.goto(URL + "#w=gym:30&rent=3000&bd=1&min=45")
         page.wait_for_function("window.__stoop && window.__stoop.map()", timeout=120000); page.wait_for_timeout(1000)
         mobile = w < 861
@@ -55,7 +55,7 @@ with sync_playwright() as pw:
     b = pw.chromium.launch(args=ARGS)
     for wide in (False, True):
         for w in (1680, 1512, 1440, 1366, 1280):
-            page = b.new_page(viewport={"width": w, "height": 800})
+            page = context(b, viewport={"width": w, "height": 800}).new_page()
             page.goto(URL + "#w=gym:30&rent=3000&bd=1&min=45")
             page.wait_for_function("window.__stoop && window.__stoop.map()", timeout=120000)
             if wide: page.add_style_tag(content=".topbar { letter-spacing: .05em; }")
