@@ -60,7 +60,7 @@
   // inside stay in plain view and the band can be fully opaque. A line offset by half its width toward the inside
   // draws that band; which side is "inside" follows the ring's direction, so every ring is rewound first
   // (outer rings counterclockwise, holes clockwise in lon/lat) and EDGE_SIDE picks the side on screen.
-  const EDGE_SIDE = -1;
+  const EDGE_SIDE = 1;   // measured: on screen (y down) a counterclockwise lon/lat ring has its inside on the right
   const ringArea = (ring) => { let a = 0; for (let i = 0, n = ring.length; i < n; i++) { const [x1, y1] = ring[i], [x2, y2] = ring[(i + 1) % n]; a += x1 * y2 - x2 * y1; } return a / 2; };
   const rewindPoly = (poly) => poly.map((ring, i) => ((ringArea(ring) > 0) === (i === 0) ? ring : ring.slice().reverse()));
   function rewind(geom) {
@@ -1896,6 +1896,7 @@
     addContextPoints(dark);
     styleReady = true;
     applyLayerVisibility();
+    paintMatchColors();   // the layers start blank: color them for the saved palette, fill strength and Fill/Edges
     pushMap(true);
   }
 
@@ -2411,7 +2412,7 @@
     if (!map || !styleReady || !map.getSource("hexes")) return;
     map.getSource("hexes").setData(hexData());
     hexShown = state.selected;
-    map.setPaintProperty("hex-fill", "fill-color", hexFillColor());
+    map.setPaintProperty("hex-fill", "fill-color", hexFillColor()); if (map.getLayer("hex-edge")) map.setPaintProperty("hex-edge", "line-color", hexFillColor(true));
   }
   function hexFillColor(solid = false) {
     const c = solid ? solidRamp() : ramp(), v = ["get", "v"];
@@ -2585,7 +2586,7 @@
       map.setFeatureState({ source: "hoods", id: r.id }, { v: v == null ? -1 : v, on: r.visible, sel: r.id === state.selected,
         short: shortlist.includes(r.id) });
     }
-    map.setPaintProperty("fill", "fill-color", fillExpression());
+    map.setPaintProperty("fill", "fill-color", fillExpression()); if (map.getLayer("edge")) map.setPaintProperty("edge", "line-color", fillExpression(true));   // classes moved: the edge band follows
     renderHexes();
     applyBoroughFilter(all);
     renderPins(all);

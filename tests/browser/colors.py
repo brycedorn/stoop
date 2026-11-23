@@ -11,6 +11,36 @@ def check(name, ok, detail=""):
     print(("PASS " if ok else "FAIL ") + name + (f"  [{detail}]" if detail != "" else ""), flush=True)
 
 
+# Which side of each outline the edges band lands on: query the band 6 px either side of several border
+# segments and test each point against the shape (point in polygon). layer: "edge" (neighborhoods) or "hex-edge".
+SIDE_JS = """async ([layer, shapes]) => {
+  const m = window.__stoop.map();
+  const inPoly = (pt, poly) => { let c = false; for (const ring of poly) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) c = !c; } return c; };
+  const inGeom = (pt, g) => g.type === 'Polygon' ? inPoly(pt, g.coordinates) : g.coordinates.some((p) => inPoly(pt, p));
+  let inside = 0, outside = 0;
+  for (const [key, val, g, zoom] of shapes) {
+    const ring = g.type === 'Polygon' ? g.coordinates[0] : g.coordinates[0][0];
+    m.setFilter(layer, ['==', ['get', key], val]);
+    for (let k = 0; k < 6; k++) {
+      const i = Math.floor((ring.length - 1) * (k + 0.5) / 6), a = ring[i], b = ring[i + 1], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      m.jumpTo({ center: mid, zoom });
+      await new Promise((res) => { m.once('idle', res); m.triggerRepaint(); });
+      const pa = m.project(a), pb = m.project(b), pm = m.project(mid), len = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+      if (len < 4) continue;
+      for (const sgn of [1, -1]) {
+        const q = { x: pm.x - sgn * (pb.y - pa.y) / len * 6, y: pm.y + sgn * (pb.x - pa.x) / len * 6 };
+        const ll = m.unproject(q);
+        if (m.queryRenderedFeatures([q.x, q.y], { layers: [layer] }).length) inGeom([ll.lng, ll.lat], g) ? inside++ : outside++;
+      }
+    }
+  }
+  m.setFilter(layer, null);
+  return [inside, outside];
+}"""
+
+
 def ready(page):
     page.wait_for_function(f"{S} && {S}.map() && {S}.map().loaded()", timeout=120000)
     page.wait_for_timeout(1200)
@@ -69,9 +99,31 @@ with sync_playwright() as pw:
     chip = page.evaluate("() => { const b = document.querySelector('#legend [data-pal]').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }")
     check("palette chips are rounded rectangles", chip[0] > chip[1], chip)
     page.screenshot(path=str(OUT / "colors_edges.png"), clip={"x": 400, "y": 72, "width": 1040, "height": 828})
+    hoods = page.evaluate(f"() => {S}.results().filter(r => r.visible && r.total != null).slice(0, 3).map(r => ['id', r.id, r.f.geometry, 15])")
+    ins, outs = page.evaluate(SIDE_JS, ["edge", hoods])
+    check("edges: neighborhood band is on the inside", ins >= 12 and outs <= 1, (ins, outs))
+    page.click("#ranking li .row"); page.wait_for_timeout(1500)
+    hx = page.evaluate("() => window.__stoop.map().getSource('hexes')._data.features.slice(0, 3).map(f => ['i', f.properties.i, f.geometry, 16.5])")
+    ins, outs = page.evaluate(SIDE_JS, ["hex-edge", hx])
+    check("edges: hex band is on the inside", ins >= 12 and outs <= 1, (ins, outs))
+    page.keyboard.press("Escape"); page.wait_for_timeout(300)
     # remembered after a reload
     page.reload(); ready(page)
     check("edges remembered", page.evaluate(f"() => {S}.state.shade") == "edge")
+    # first load with Edges saved: the bands draw straight away, no Fill/Edges toggle needed
+    page.evaluate(f"() => {S}.map().jumpTo({{center: [-73.93, 40.715], zoom: 11}})"); page.wait_for_timeout(800); idle(page)
+    first = page.evaluate("""() => { const m = window.__stoop.map();
+      return { n: m.queryRenderedFeatures({ layers: ['edge'] }).length, op: JSON.stringify(m.getPaintProperty('edge', 'line-opacity')),
+               color: JSON.stringify(m.getPaintProperty('edge', 'line-color')) }; }""")
+    check("edges: drawn on first load", first["n"] > 20 and "rgba(0,0,0,0)" != first["color"].strip('"') and '"case"' in first["op"], first["n"])
+    # the classes move when the filters change: the bands must follow the fill
+    page.evaluate("() => { const r = document.getElementById('budget') || document.querySelector('input[type=range][aria-label*=rent i]'); r.value = +r.value - 800; r.dispatchEvent(new Event('input', {bubbles: true})); }")
+    page.wait_for_timeout(600)
+    th = page.evaluate("""() => { const m = window.__stoop.map();
+      const step = (e) => Array.isArray(e) ? (e[0] === 'step' ? e : e.map(step).find(Boolean)) : null;
+      const cuts = (e) => { const st = step(e); return st ? [3, 5, 7, 9].map((i) => +st[i].toFixed(3)) : null; };
+      return [cuts(m.getPaintProperty('fill', 'fill-color')), cuts(m.getPaintProperty('edge', 'line-color'))]; }""")
+    check("edges: band classes follow the filters", th[0] is not None and th[0] == th[1], th)
     page.click('#legend [data-shade="fill"]'); page.wait_for_timeout(300)
     check("palette remembered", page.evaluate(f"() => {S}.state.palette") == "teal")
     check("fill remembered", abs(page.evaluate(f"() => {S}.state.fill") - 0.3) < 1e-9)
