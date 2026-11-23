@@ -26,39 +26,10 @@
   const TOUCH = () => matchMedia("(hover: none)").matches;   // no hover: taps show map details
   const DOCKED = () => matchMedia("(max-width: 1180px) and (min-width: 861px)").matches;   // details replace the list
 
-  // Factor groups: the tag color says which group, the icon says which factor, the text says it in words.
-  // Three hues only: dataviz's categorical slots 1-3 are the set that passes all-pairs (validate_palette.js
-  // --pairs all, light and dark); a fourth hue fails, so the fourth group is neutral ink.
-  const GROUPS = [
-    { id: "cost", title: "Cost & space", keys: ["rent", "size", "space"], color: { light: "#2a78d6", dark: "#3987e5" } },
-    { id: "move", title: "Getting around", keys: ["commute", "airports", "citibike", "errands"], color: { light: "#eb6834", dark: "#d95926" } },
-    { id: "life", title: "Lifestyle & outdoors", keys: ["running", "gym", "dogs", "green", "favorites", "familiarity"], color: { light: "#1baf7a", dark: "#199e70" } },
-    { id: "env", title: "Safety & environment", keys: ["safety", "quiet", "air"], color: { light: "#6f6d68", dark: "#9a988f" } },
-  ];
+  const { GROUPS, OTHER, ICON_PATHS, RANK_WEIGHTS } = window.STOOP_UI;   // factors.js, shared with the ranking page
   const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => g.keys.map((k) => [k, g])));
-  const OTHER = { id: "other", title: "Other", keys: [], color: { light: "#6f6d68", dark: "#9a988f" } };
   const groupOf = (k) => GROUP_OF[k] || OTHER;
   const groupColor = (k) => groupOf(k).color[theme()];
-  // 24px stroke icons, one per factor (shape carries identity alongside the group color)
-  const ICON_PATHS = {
-    dogs: "M4.4 10.5a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M7.9 6.3a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M12.9 6.3a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M16.4 10.5a1.6 1.9 0 1 0 3.2 0a1.6 1.9 0 1 0-3.2 0M12 12.5c-2.5 0-5 3-5 5.2 0 1.5 1.2 2.3 2.6 2.3 1 0 1.6-.5 2.4-.5s1.4.5 2.4.5c1.4 0 2.6-.8 2.6-2.3 0-2.2-2.5-5.2-5-5.2z",
-    rent: "M12 3v18M16.5 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7",
-    size: "M4 4h16v16H4zM4 12h7v8M15 4v5",
-    space: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 20c0-3 2.4-5 5.5-5s5.5 2 5.5 5M13.5 15.3c.9-.2 1.9-.3 3-.3 3.1 0 5 2 5 5",
-    commute: "M7 3h10a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zM4 10h16M8 21l2-4M16 21l-2-4M8.5 13.5h.01M15.5 13.5h.01",
-    citibike: "M5.5 18.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM18.5 18.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5.5 15l4-7h5.5l3.5 7M9.5 8 8 5H6M12 15l3-7",
-    errands: "M5 8h14l-1.2 12H6.2zM9 8V6.5a3 3 0 0 1 6 0V8",
-    running: "M4 19c4.5 0 3.5-7 8-7s3.5-7 8-7M18 3l2 2-2 2",
-    green: "M12 22v-5M12 2.5l6 8.5h-3.2l4.2 6H5l4.2-6H6z",
-    favorites: "M7 3v7a2 2 0 0 0 4 0V3M9 12v9M17 3c-1.7 1.6-2 5.5 0 7.5V21",
-    familiarity: "M12 20s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7.3 4.2 4.2 0 0 1 19.5 10c0 5.6-7.5 10-7.5 10z",
-    gym: "M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11",
-    airports: "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z",
-    bus: "M7 3.5h10A2.5 2.5 0 0 1 19.5 6v10.5h-15V6A2.5 2.5 0 0 1 7 3.5zM4.5 11h15M7.5 20v-3.5M16.5 20v-3.5M8 14h.01M16 14h.01",
-    safety: "M12 3l7.5 3v6c0 4.2-3.1 7.4-7.5 9-4.4-1.6-7.5-4.8-7.5-9V6z",
-    air: "M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8",
-    quiet: "M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z",
-  };
   const icon = (k) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON_PATHS[k] || "M12 12h.01"}"/></svg>`;
   // A tag: tinted chip + colored icon (identity) + ink text (dataviz: text never wears the series color)
   const tag = (k, { weak = false, text = null } = {}) =>
@@ -183,8 +154,34 @@
   // radius filter stay out of it: they're places (often a home or an office) and a link gets passed around.
   const BORO_CODE = { Bronx: "x", Brooklyn: "k", Manhattan: "m", Queens: "q", "Staten Island": "s" };
   let linkSelect = null;
+  // A partner's answer from the ranking page (rank.html): #add=1&pn=Sam&pw=running:30,…&ppin=lat,lon,place.
+  // It adds them as your partner, and their commute place as a pin, and leaves everything of yours as it was.
+  let linkImported = null;
+  const parseWeights = (str) => {
+    const w = Object.fromEntries(FACTORS.map((k) => [k, 0])), old = {};
+    for (const part of String(str || "").split(",")) {
+      const [k, v] = part.split(":");
+      if (!(Number.isFinite(+v) && +v >= 0)) continue;
+      if (FACTORS.includes(k)) w[k] = Math.min(100, Math.round(+v));
+      else if (k in MERGED_INTO) old[k] = Math.min(100, Math.round(+v));
+    }
+    takeMerged(old, w);
+    return w;
+  };
+  function importPartner(h) {
+    const q = { name: cleanName(h.get("pn"), "Partner"), weights: parseWeights(h.get("pw")), pin: null };
+    const [lat, lon, ...place] = String(h.get("ppin") || "").split(",");
+    if (Number.isFinite(+lat) && Number.isFinite(+lon) && lat !== "" && Math.abs(+lat - 40.7) < 1 && Math.abs(+lon + 74) < 1) {
+      const d = { name: `${q.name} · ${cleanName(place.join(","), "work")}`, lat: +(+lat).toFixed(5), lon: +(+lon).toFixed(5), weight: 1, on: false };
+      if (!dests.some((x) => x.lat === d.lat && x.lon === d.lon)) dests.push(d);
+      q.pin = { lat: d.lat, lon: d.lon };
+    }
+    state.people[1] = q;
+    linkImported = q.name;
+  }
   function readLink() {
     const h = new URLSearchParams(location.hash.slice(1));
+    if (h.get("add") === "1" && h.has("pw")) { importPartner(h); return; }
     if (h.has("w")) {
       const w = Object.fromEntries(FACTORS.map((k) => [k, 0])), old = {};
       for (const part of h.get("w").split(",")) {
@@ -534,6 +531,7 @@
   const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linejoin="round" d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>';
   const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>';
   const CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  const SEND = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5zM11.5 13.5 20 4"/></svg>';
   const PLUS = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
   const ALERT = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>';
 
@@ -950,10 +948,14 @@
   function weightsEqual(a, b) { return FACTORS.every((k) => (a[k] || 0) === (b?.[k] || 0)); }
   function renderPeople() {
     const q = partner(), box = $("people");
+    const invite = `<button class="btn ghost sm" type="button" id="invite">${SEND}${q ? `Send ${esc(q.name)} the ranking page` : "Send your partner a ranking page"}</button>`;
+    const note = peopleNote ? `<p class="ok-line" role="status">${esc(peopleNote)}</p>` : "";
     if (!q) {
-      box.innerHTML = `<button class="btn ghost sm" type="button" id="addPartner">${PLUS}Add a partner's priorities</button>
-        <p class="ts">Rank for two: each of you sets priorities, and the list shows where you both do well.</p>`;
+      box.innerHTML = `${note}<div class="who-actions"><button class="btn ghost sm" type="button" id="addPartner">${PLUS}Add a partner's priorities</button>${invite}</div>
+        <p class="ts" id="peopleMsg" role="status">Rank for two: each of you sets priorities, and the list shows where you both do well.
+          Fill theirs in here, or send them a page to rank on their phone and send back.</p>`;
       $("addPartner").onclick = () => { state.people[1] = newPartner(); setEditing(1); $("personName")?.focus(); };
+      $("invite").onclick = sendInvite;
       return;
     }
     const me = state.people[state.editing];
@@ -967,7 +969,9 @@
           <option value="-1">Same as ${esc(state.people[0].name === "You" ? "yours" : state.people[0].name + "'s")}</option>
           ${dests.map((d, i) => `<option value="${i}"${i === pin ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select></label>
           <button class="btn ghost sm" type="button" id="removePartner">Remove ${esc(q.name)}</button>` : ""}
-      </div>`;
+      </div>
+      ${note}<div class="who-actions">${invite}</div><p class="ts" id="peopleMsg" role="status" hidden></p>`;
+    $("invite").onclick = sendInvite;
     box.querySelector(".who").onclick = (e) => { const b = e.target.closest("[data-who]"); if (b) setEditing(+b.dataset.who); };
     $("personName").onchange = (e) => {
       me.name = cleanName(e.target.value, state.editing ? "Partner" : "You");
@@ -980,6 +984,20 @@
     };
     if ($("removePartner")) $("removePartner").onclick = () => { state.people.length = 1; setEditing(0); };
   }
+  // A link to the ranking page, signed with your name; what comes back adds them here (importPartner)
+  async function sendInvite() {
+    const me = state.people[0].name;
+    const url = new URL("rank.html", location.href).href.split("#")[0] + (me && me !== "You" ? "#from=" + encodeURIComponent(me) : "");
+    const msg = $("peopleMsg");
+    let text;
+    try {
+      if (navigator.share && TOUCH()) { await navigator.share({ title: "What matters to you in a neighborhood?", url }); text = "Sent. When the link comes back, open it here."; }
+      else { await navigator.clipboard.writeText(url); text = "Link copied. Send it; when the link comes back, open it here to add their priorities."; }
+    } catch (e) { text = `Send this link: ${url}`; }
+    if (me === "You") text += " Tip: set your name above first, so the page says who's asking.";
+    msg.textContent = text; msg.hidden = false;
+  }
+  let peopleNote = null;
   function setEditing(i) {
     state.editing = Math.min(i, state.people.length - 1);
     renderPeople(); syncWeights(true); update();
@@ -1044,7 +1062,6 @@
   // ---------- priorities as a ranked list: drag (or arrow keys) to order; rank sets the weight ----------
   // Top counts most; weights fall off down the list. Factors below the "doesn't matter" line weigh 0.
   // The sliders under "Fine-tune" still set exact weights; the list re-sorts to match them.
-  const RANK_WEIGHTS = [30, 22, 16, 12, 9, 7, 5, 4, 3, 2];
   const rankWeight = (i) => RANK_WEIGHTS[i] ?? 2;
   const GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
   let rankDrag = null;   // the drag in progress, if any
@@ -2645,6 +2662,10 @@
   update();
   initMap();
   if (linkSelect) select(linkSelect, true);
+  if (linkImported) {   // a partner's ranking just arrived: show it where it's edited
+    peopleNote = `${linkImported}'s priorities are in. The list now ranks for both of you.`;
+    setTab("priorities"); renderPeople(); renderDestMenu();
+  }
   $("copyLink").onclick = async () => {
     writeLink();
     let url = location.href, ok = false;
