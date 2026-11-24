@@ -45,6 +45,12 @@ with sync_playwright() as pw:
     check("transit and places start at street zoom", late and all(z >= 13 for z in late), late)
     parks = page.evaluate(f"() => {S}.map().getLayer('parks-fill')?.minzoom || 0")
     check("parks stay at city zoom", parks < 13, parks)
+    loose = page.evaluate("""() => { const out = [];
+      const walk = (rules, gated) => { for (const r of rules) {
+        if (r.media) walk(r.cssRules, gated || r.media.mediaText.includes('hover: hover'));
+        else if (r.selectorText && r.selectorText.includes(':hover') && !gated) out.push(r.selectorText); } };
+      for (const s of document.styleSheets) { try { walk(s.cssRules, false); } catch (e) {} } return out; }""")
+    check("hover styles only where a mouse can hover (no sticky taps)", not loose and not page.evaluate("matchMedia('(hover: hover) and (pointer: fine)').matches"), loose[:4])
     sizes = page.evaluate("() => ['#search', '#sort'].map(s => parseFloat(getComputedStyle(document.querySelector(s)).fontSize))")
     check("text fields at 16px (no zoom on focus)", all(s >= 16 for s in sizes), sizes)
 

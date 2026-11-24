@@ -1063,7 +1063,7 @@
         ${state.people.map((x, i) => `<button type="button" data-who="${i}" aria-pressed="${i === state.editing}">${esc(x.name)}</button>`).join("")}
       </div>
       <div class="who-edit">
-        <label>Name <input id="personName" type="text" maxlength="20" autocomplete="off" value="${esc(me.name)}"></label>
+        <label>Name <input id="personName" type="text" maxlength="20" autocomplete="off" enterkeyhint="done" value="${esc(me.name)}"></label>
         ${state.editing === 1 ? `<label>Commutes to <select id="partnerPin">
           <option value="-1">Same as ${esc(state.people[0].name === "You" ? "yours" : state.people[0].name + "'s")}</option>
           ${dests.map((d, i) => `<option value="${i}"${i === pin ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select></label>
@@ -1829,10 +1829,10 @@
       <p class="dd-hint">Commute is scored to the one place you pick. Drag its pin on the map to move it.</p>
       <div role="radiogroup" aria-label="Commute to">${dests.map((d, i) => `<div class="dest-row">
         <input type="radio" name="destPick" data-on="${i}" ${d.on ? "checked" : ""} aria-label="Commute to ${esc(d.name)}">
-        <input type="text" data-name="${i}" value="${esc(d.name)}" aria-label="Destination name" autocomplete="off" spellcheck="false">
+        <input type="text" data-name="${i}" value="${esc(d.name)}" aria-label="Destination name" autocomplete="off" spellcheck="false" enterkeyhint="done">
         <button class="icon-btn" type="button" data-del="${i}" aria-label="Remove ${esc(d.name)}">${CLOSE}</button></div>`).join("")}</div>
       <form class="addr" id="addrForm">
-        <input type="text" id="addrInput" placeholder="Add an address, e.g. 3 World Trade Center…" aria-label="Add a destination by address" autocomplete="off">
+        <input type="text" id="addrInput" placeholder="Add an address, e.g. 3 World Trade Center…" aria-label="Add a destination by address" autocomplete="off" enterkeyhint="search">
         <button class="btn" type="submit">Add</button>
       </form>
       <p class="addr-msg" id="addrMsg" role="status"></p>

@@ -77,7 +77,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 button, input, select { font: inherit; color: inherit; }
-button, input, select, summary, a, .dest, .pin { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+/* Touch: no gray tap flash or landscape font inflation; hover styles only apply where a mouse can hover, so a tap
+   doesn't leave them stuck on (touch gets the :active press states below instead) */
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button, input, select, summary, a, .dest, .pin { touch-action: manipulation; }
+/* a long press on a control shouldn't select its label or pop the link callout */
+button, summary, .tabs, .seg-row label { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+@media (hover: none), (pointer: coarse) {
+  .ranking li:active, .icon-btn:active, .presets button:active, .btn.ghost:active, .d-back:active,
+  .dd-menu label:not(.range):active, .layers-menu label.lm-row:active { background: var(--wash); }
+  .tabs button:active { color: var(--ink); }
+}
 /* .mk is the MapLibre marker root: leave its position and transform alone (MapLibre sets both) */
 .mk { line-height: 0; }
 #detail, .cmp, .pane, .dd-menu { overscroll-behavior: contain; }
@@ -103,13 +113,13 @@ code { font-family: var(--mono); font-size: 12px; background: var(--wash); paddi
   font-weight: 550; transition: background-color .15s var(--ease), transform .1s var(--ease), border-color .15s;
 }
 /* the wash is translucent: layer it over the raised color so buttons over the map stay opaque */
-.btn:hover { background-color: var(--raised); background-image: linear-gradient(var(--wash), var(--wash)); border-color: var(--rule); }
+@media (hover: hover) and (pointer: fine) { .btn:hover { background-color: var(--raised); background-image: linear-gradient(var(--wash), var(--wash)); border-color: var(--rule); } }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
-.btn.primary:hover { background: var(--accent-fill-hover); border-color: var(--accent-fill-hover); }
+@media (hover: hover) and (pointer: fine) { .btn.primary:hover { background: var(--accent-fill-hover); border-color: var(--accent-fill-hover); } }
 .btn.sm { min-height: 28px; padding: 0 10px; font-size: 12.5px; }
 .btn.ghost { border-color: transparent; background: none; color: var(--accent-ink); padding: 0 6px; }
-.btn.ghost:hover { background: var(--wash); }
+@media (hover: hover) and (pointer: fine) { .btn.ghost:hover { background: var(--wash); } }
 .btn .ic { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .link-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 2px 0 10px; }
 .link-row .ts { margin: 0; color: var(--ink-3); font-size: 12px; }
@@ -123,7 +133,7 @@ code { font-family: var(--mono); font-size: 12px; background: var(--wash); paddi
   display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
   border: 0; background: none; cursor: pointer; color: var(--ink-3); transition: background-color .15s, color .15s;
 }
-.icon-btn:hover { background: var(--wash); color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .icon-btn:hover { background: var(--wash); color: var(--ink); } }
 .icon-btn svg { width: 18px; height: 18px; }
 
 /* ---------- top bar: must-haves ---------- */
@@ -157,7 +167,7 @@ code { font-family: var(--mono); font-size: 12px; background: var(--wash); paddi
 }
 .seg-row input:checked + span { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .seg-row input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
-.seg-row label:hover input:not(:checked) + span { color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .seg-row label:hover input:not(:checked) + span { color: var(--ink); } }
 
 .range { display: flex; flex-direction: column; gap: 2px; width: 150px; }
 .range-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); font-weight: 550; letter-spacing: .02em; }
@@ -176,7 +186,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
   overflow: hidden; text-overflow: ellipsis;
 }
 .dd-btn::after { content: ""; flex: none; width: 6px; height: 6px; border: solid var(--ink-3); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg) translateY(-2px); }
-.dropdown summary:hover .dd-btn { border-color: var(--rule); }
+@media (hover: hover) and (pointer: fine) { .dropdown summary:hover .dd-btn { border-color: var(--rule); } }
 .dd-btn.edited::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--mark); box-shadow: 0 0 0 1px var(--ink); }
 .dd-menu.dest-menu { min-width: 320px; padding: 10px; }
 .dd-menu.area-menu { width: 340px; padding: 10px; }
@@ -190,14 +200,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
   transition: transform .12s var(--ease);
 }
 .area-pin svg { width: 16px; height: 16px; }
-.area-pin:hover, .area-pin.dragging { transform: scale(1.18); }
+.area-pin.dragging { transform: scale(1.18); }
+@media (hover: hover) and (pointer: fine) { .area-pin:hover { transform: scale(1.18); } }
 .area-pin.dragging { cursor: grabbing; }
 .dd-hint { margin: 2px 4px 8px; font-size: 12px; color: var(--ink-3); }
 .dest-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .dest-row input[type=text] {
   flex: 1; min-width: 0; height: 32px; padding: 0 8px; border-radius: var(--radius-sm); border: 1px solid transparent; background: none;
 }
-.dest-row input[type=text]:hover { border-color: var(--border); }
+@media (hover: hover) and (pointer: fine) { .dest-row input[type=text]:hover { border-color: var(--border); } }
 .dest-row input[type=text]:focus { border-color: var(--accent); outline: none; background: var(--raised); }
 .dest-row input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0 2px 0 4px; flex: none; cursor: pointer; }
 .dd-actions { display: flex; gap: 8px; margin: 8px 0 4px; }
@@ -214,7 +225,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
 }
 /* menu rows: checkbox/radio labels. Scoped so a slider (.range) or a text box in a menu keeps its own size */
 .dd-menu label:not(.range) { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-sm); cursor: pointer; }
-.dd-menu label:not(.range):hover { background: var(--wash); }
+@media (hover: hover) and (pointer: fine) { .dd-menu label:not(.range):hover { background: var(--wash); } }
 .dd-menu input:is([type=checkbox], [type=radio]) { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
 
 .filters-toggle { display: none; }
@@ -250,7 +261,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
   position: relative; border: 0; background: none; padding: 10px 10px 12px; cursor: pointer;
   color: var(--ink-3); font-weight: 600; font-size: 13px; transition: color .15s;
 }
-.tabs button:hover { color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .tabs button:hover { color: var(--ink); } }
 .tabs button[aria-selected="true"] { color: var(--ink); }
 .tabs button[aria-selected="true"]::after {
   content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; background: var(--ink); border-radius: 2px;
@@ -280,7 +291,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0 0; h
   flex: none; width: 132px; height: 38px; padding: 0 6px; border-radius: var(--radius-sm); border: 1px solid var(--border);
   background: var(--raised); font-weight: 550; font-size: 13px; cursor: pointer;
 }
-#sort:hover { border-color: var(--rule); }
+@media (hover: hover) and (pointer: fine) { #sort:hover { border-color: var(--rule); } }
 .search kbd { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .search input:focus + kbd, .search input:not(:placeholder-shown) + kbd { display: none; }
 .search input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-wash); }
@@ -299,7 +310,8 @@ details.how li + li { margin-top: 4px; }
    "auto" remembers each row's real height once rendered. A focused row opts out: containment would clip its ring. */
 .ranking li { content-visibility: auto; contain-intrinsic-size: auto 62px; }
 .ranking li:focus-within { content-visibility: visible; }
-.ranking li.hl, .ranking li:hover { background: var(--wash); }
+.ranking li.hl { background: var(--wash); }
+@media (hover: hover) and (pointer: fine) { .ranking li:hover { background: var(--wash); } }
 .ranking li.sel { background: var(--accent-wash); }
 .ranking .row {
   flex: 1; min-width: 0; display: grid; grid-template-columns: 24px 1fr 34px; gap: 0 8px; align-items: center;
@@ -380,7 +392,7 @@ details.how li + li { margin-top: 4px; }
   border: 1px solid var(--border); background: var(--raised); border-radius: 999px; height: 30px; padding: 0 12px;
   font-size: 12.5px; cursor: pointer; transition: background-color .15s, border-color .15s;
 }
-.presets button:hover { background: var(--wash); border-color: var(--rule); }
+@media (hover: hover) and (pointer: fine) { .presets button:hover { background: var(--wash); border-color: var(--rule); } }
 .presets button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 /* ---------- priorities: ranked list ---------- */
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -391,7 +403,7 @@ details.how li + li { margin-top: 4px; }
   box-shadow: 0 1px 2px rgba(11, 11, 11, .06); cursor: grab; user-select: none; -webkit-user-select: none;
   touch-action: pan-y; will-change: transform;
 }
-.rk:hover { box-shadow: 0 1px 2px rgba(11, 11, 11, .06), 0 0 0 1px var(--rule) inset; }
+@media (hover: hover) and (pointer: fine) { .rk:hover { box-shadow: 0 1px 2px rgba(11, 11, 11, .06), 0 0 0 1px var(--rule) inset; } }
 .rk .wic { color: var(--tc); display: inline-grid; place-items: center; }
 .rk .wic .ic { width: 18px; height: 18px; }
 .rk-name { font-size: 13.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -401,7 +413,7 @@ details.how li + li { margin-top: 4px; }
   background: none; color: var(--ink-3); cursor: grab; touch-action: none;
 }
 .rk-grip svg { width: 16px; height: 16px; fill: currentColor; }
-.rk-grip:hover { color: var(--ink); background: var(--wash); }
+@media (hover: hover) and (pointer: fine) { .rk-grip:hover { color: var(--ink); background: var(--wash); } }
 .rk.rk-off { background: transparent; box-shadow: none; }
 .rk.rk-off .rk-name { color: var(--ink-3); font-weight: 550; }
 .rk.rk-off .wic { opacity: .55; }
@@ -511,13 +523,13 @@ details.how li + li { margin-top: 4px; }
 .lm-h { font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 4px 6px; }
 .layers-menu .lm-row { display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 4px 6px; border-radius: var(--radius-sm); font-size: 13px; }
 .layers-menu label.lm-row { cursor: pointer; }
-.layers-menu label.lm-row:hover { background: var(--wash); }
+@media (hover: hover) and (pointer: fine) { .layers-menu label.lm-row:hover { background: var(--wash); } }
 .layers-menu .lm-row small { margin-left: auto; color: var(--ink-3); font-size: 11.5px; }
 .layers-menu .lm-row.key { color: var(--ink-2); font-size: 12.5px; }
 .layers-menu .lm-sep { border-top: 1px solid var(--hair); margin: 6px 0; }
 .layers-menu .key-ic { display: inline-grid; place-items: center; width: 30px; flex: none; }
 .layers-menu .pin { cursor: default; }
-.layers-menu .pin:hover { transform: none; }
+@media (hover: hover) and (pointer: fine) { .layers-menu .pin:hover { transform: none; } }
 .map-btn { box-shadow: var(--shadow); white-space: nowrap; flex-shrink: 0; }
 
 /* rank badges on the map */
@@ -526,7 +538,7 @@ details.how li + li { margin-top: 4px; }
   background: var(--raised); color: var(--ink); font: 700 11px/1 var(--font); font-variant-numeric: tabular-nums;
   box-shadow: 0 0 0 1.5px var(--ink), 0 2px 6px rgba(0,0,0,.25); cursor: pointer; transition: transform .12s var(--ease);
 }
-.pin:hover { transform: scale(1.18); }
+@media (hover: hover) and (pointer: fine) { .pin:hover { transform: scale(1.18); } }
 .pin.sel { background: var(--ink); color: var(--surface); }
 .pin.short { grid-auto-flow: column; gap: 2px; padding: 0 6px 0 5px; }
 .pin.short svg { width: 11px; height: 11px; fill: currentColor; stroke: none; }
@@ -541,14 +553,16 @@ details.how li + li { margin-top: 4px; }
   margin-bottom: 6px; transition: transform .12s var(--ease);
 }
 .dest-pin svg { width: 16px; height: 16px; transform: rotate(45deg); }
-.dest:hover .dest-pin, .dest.dragging .dest-pin { transform: rotate(-45deg) scale(1.18); }
+.dest.dragging .dest-pin { transform: rotate(-45deg) scale(1.18); }
+@media (hover: hover) and (pointer: fine) { .dest:hover .dest-pin { transform: rotate(-45deg) scale(1.18); } }
 .dest-shadow { position: absolute; bottom: 0; width: 14px; height: 5px; border-radius: 50%; background: rgba(0,0,0,.35); filter: blur(1.5px); }
 .dest.off .dest-pin { background: var(--raised); color: var(--ink-3); box-shadow: 0 0 0 1.5px var(--rule), 0 2px 6px rgba(0,0,0,.2); }
 .dest-label {
   position: absolute; bottom: 44px; white-space: nowrap; padding: 2px 7px; border-radius: 5px; font: 600 11.5px/1.4 var(--font);
   background: var(--raised); color: var(--ink); box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .12s;
 }
-.dest:hover .dest-label, .dest.dragging .dest-label { opacity: 1; }
+.dest.dragging .dest-label { opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .dest:hover .dest-label { opacity: 1; } }
 .dest-mini { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 3px; background: var(--ink); color: var(--surface); }
 .dest-mini svg { width: 10px; height: 10px; }
 .map-hint {
@@ -563,7 +577,7 @@ details.how li + li { margin-top: 4px; }
 }
 .sel-chip span { overflow: hidden; text-overflow: ellipsis; }
 .sel-chip .icon-btn { color: var(--surface); width: 30px; height: 30px; }
-.sel-chip .icon-btn:hover { background: rgba(127,127,127,.25); color: var(--surface); }
+@media (hover: hover) and (pointer: fine) { .sel-chip .icon-btn:hover { background: rgba(127,127,127,.25); color: var(--surface); } }
 
 #tooltip {
   position: absolute; z-index: 6; pointer-events: none; min-width: 170px; max-width: 260px;
@@ -584,7 +598,7 @@ details.how li + li { margin-top: 4px; }
   display: block; width: 100%; text-align: left; padding: 8px 10px; margin: 0 0 6px; border-radius: var(--radius-sm);
   border: 1px solid var(--hair); background: var(--raised); cursor: pointer; transition: border-color .15s, background-color .15s;
 }
-.air-item:hover { border-color: var(--rule); }
+@media (hover: hover) and (pointer: fine) { .air-item:hover { border-color: var(--rule); } }
 .air-item.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .air-top { display: flex; align-items: center; gap: 4px; }
 .air-top .wic { margin-right: 4px; }
@@ -605,7 +619,7 @@ details.how li + li { margin-top: 4px; }
 }
 .d-back { display: none; align-items: center; gap: 4px; margin: -4px 0 10px -6px; padding: 4px 8px 4px 4px;
   border: 0; border-radius: var(--radius-sm); background: none; color: var(--accent-ink); font-weight: 600; cursor: pointer; }
-.d-back:hover { background: var(--wash); }
+@media (hover: hover) and (pointer: fine) { .d-back:hover { background: var(--wash); } }
 .d-back svg { width: 18px; height: 18px; }
 .d-grab { display: none; }
 /* keep the zoom buttons clear of the open panel */
