@@ -1366,11 +1366,12 @@
       </div>`;
     if ($("legend")._html !== html) { $("legend").innerHTML = html; $("legend")._html = html; }
   }
+  const RINGED = new Set(["bus", "busroutes", "airports", "grocery", "gyms", "dogs", "places"]);   // swatches with a white ring
   function renderLayersMenu() {
     const avail = CONTEXT.filter((c) => c.has());
     $("layersMenu").innerHTML = (avail.length ? `<div class="lm-h">Show on map</div>` +
       avail.map((c) => `<label class="lm-row"><input type="checkbox" data-layer="${c.id}" ${layerOn[c.id] ? "checked" : ""}>
-        <span class="sw sw-${c.id}"></span>${esc(c.label)}${c.note ? `<small>${esc(c.note)}</small>` : ""}</label>`).join("") +
+        <span class="sw sw-${c.id}${RINGED.has(c.id) ? " sw-ring" : ""}"></span>${esc(c.label)}${c.note ? `<small>${esc(c.note)}</small>` : ""}</label>${c.id === "places" ? placesEditorHtml() : ""}`).join("") +
       `<div class="lm-sep"></div>` : "") + `<div class="lm-h">Key</div>
       <div class="lm-row key"><span class="key-ic"><span class="pin">1</span></span>Top ${topPins()} matches, by rank</div>
       <div class="lm-row key"><span class="key-ic"><span class="pin short">${STAR}</span></span>On your shortlist</div>
@@ -1379,8 +1380,19 @@
       ${HX ? `<div class="lm-row key"><span class="key-ic"><span class="sw sw-hexes"></span></span>Hexes: spots ~260 m wide inside the open area${HX.inherited.length ? `; ${esc(listJoin(HX.inherited.filter((k) => AVAILABLE.includes(k)).map((k) => META.factors[k].label.toLowerCase())))} are area-wide` : ""}</div>
       <div class="lm-row key"><span class="key-ic"><span class="sw sw-hexes few"></span></span>Faded hex: few residents (park, industry, rail)</div>` : ""}
       <div class="lm-row key"><span class="key-ic"><span class="dest-mini">${BRIEFCASE}</span></span>Commute destination: drag to move</div>`;
+    fitLayersMenu();
+  }
+  // A tall menu (a long places list, a short window) scrolls inside the space below its button instead of running
+  // off the bottom; one that fits is left alone.
+  function fitLayersMenu() {
+    const m = $("layersMenu");
+    if (!$("layersBox").open) return;
+    m.style.maxHeight = "";
+    const r = m.getBoundingClientRect(), room = Math.floor(innerHeight - r.top - 12);
+    if (r.height > room) m.style.maxHeight = Math.max(room, 160) + "px";
   }
   function bindLegend() {
+    bindPlacesEditor();
     $("layersMenu").addEventListener("change", (e) => {
       const id = e.target.dataset.layer;
       if (!id) return;
@@ -1979,12 +1991,161 @@
     { id: "grocery", label: "Full-size grocery", has: () => L.grocery?.length, layers: ["grocery", "grocery-hover", "grocery-count", "grocery-sel", "grocery-sel-ring"] },
     { id: "dogs", label: "Dog runs", has: () => L.dogs?.length, layers: ["dogs", "dogs-hover", "dogs-count", "dogs-sel", "dogs-sel-ring"] },
     { id: "gyms", label: "Full-size gyms", has: () => L.gyms?.length, layers: ["gyms", "gyms-hover", "gyms-count", "gyms-sel", "gyms-sel-ring"] },
-    { id: "places", label: "Your bars & restaurants", has: () => L.places?.length, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
+    { id: "places", label: "Your bars & restaurants", has: () => true, layers: ["places", "places-hover", "places-count", "places-sel", "places-sel-ring"] },
     { id: "airports", label: "Airports", has: () => L.airports?.length, layers: ["airports", "airports-hover", "airport-codes"] },
     { id: "hexes", label: "Detail inside the selected area", has: () => HX, layers: ["hex-fill", "hex-edge", "hex-edge-weak", "hex-line", "hex-hover"] },
   ];
   let layerOn = Object.fromEntries(CONTEXT.map((c) => [c.id, true]));
   try { Object.assign(layerOn, JSON.parse(localStorage.getItem(LAYER_KEY) || "{}")); } catch (e) {}
+  // ---------- your bars & restaurants, edited in this browser ----------
+  // The built list (inputs/places.csv, located by the pipeline) is a starting point. Places you add or remove here are
+  // kept in this browser only: they never go into shared links or the public site. They're map context and the
+  // "In this neighborhood" note, not a scored factor, so nothing needs rebuilding. The public site ships no list, so
+  // a visitor starts their own.
+  const PLACES_KEY = "stoop.places.v1";
+  const BUILT_PLACES = L.places || [];
+  let placeEdits = { add: [], hide: [] };   // add: point rows; hide: names from the built list (every branch)
+  try {
+    const saved = JSON.parse(localStorage.getItem(PLACES_KEY) || "null");
+    if (saved && Array.isArray(saved.add) && Array.isArray(saved.hide)) placeEdits = saved;
+  } catch (e) {}
+  function applyPlaceEdits() {
+    const hide = new Set(placeEdits.hide);
+    L.places = BUILT_PLACES.filter((r) => !hide.has(r[2])).concat(placeEdits.add);
+  }
+  applyPlaceEdits();
+  const placesEdited = () => placeEdits.add.length > 0 || placeEdits.hide.length > 0;
+  const placeUi = { open: false, hits: [], msg: "", undo: null, query: "" };
+  function placesChanged() {
+    try { localStorage.setItem(PLACES_KEY, JSON.stringify(placeEdits)); } catch (e) {}
+    applyPlaceEdits();
+    GROUPED.places.cache = {};
+    NEARBY.clear();
+    const src = map && map.getSource("places");
+    if (src) {
+      map.removeFeatureState({ source: "places" });   // ids are regenerated with the new data
+      pointHovers = pointHovers.filter((h) => h.source !== "places");
+      src.setData(groupFC("places", GROUPED.places.level));
+    }
+    renderLayersMenu();
+    if (state.selected) renderDetail();
+  }
+  // Nominatim's address parts for a borough name the map's filter knows ("" if it can't tell)
+  const COUNTY_BORO = { kings: "Brooklyn", "new york": "Manhattan", richmond: "Staten Island", queens: "Queens", bronx: "Bronx" };
+  function boroOfAddress(a) {
+    for (const v of [a.borough, a.suburb, a.city_district, a.county]) {
+      if (!v) continue;
+      const n = String(v).replace(/^the\s+/i, "").replace(/\s+county$/i, "").trim().toLowerCase();
+      const hit = BOROUGHS.find((b) => b.toLowerCase() === n) || BOROUGHS.find((b) => b === COUNTY_BORO[n]);
+      if (hit) return hit;
+    }
+    return "";
+  }
+  function placesEditorHtml() {
+    const counts = new Map();
+    for (const r of L.places) counts.set(r[2], (counts.get(r[2]) || 0) + 1);
+    const list = [...counts].sort((a, b) => a[0].localeCompare(b[0]));
+    const hits = placeUi.hits.length ? `<ul class="pl-hits" aria-label="Places found">${placeUi.hits.map((h, i) =>
+      `<li><button type="button" class="pl-hit" data-hit="${i}"><b>${esc(h.name)}</b>${h.where ? `<span>${esc(h.where)}</span>` : ""}</button></li>`).join("")}</ul>` : "";
+    const rows = list.length ? `<ul class="pl-list" aria-label="Your places">${list.map(([n, k]) => `<li><span class="pl-name">${esc(n)}${k > 1 ? ` <small>${k} spots</small>` : ""}</span>
+      <button class="icon-btn" type="button" data-unplace="${esc(n)}" aria-label="Remove ${esc(n)}">${CLOSE}</button></li>`).join("")}</ul>`
+      : `<p class="dd-hint">Find a place by name to pin it on the map; each neighborhood's details list the ones inside it.</p>`;
+    return `<details class="pl-ed" id="plEd"${placeUi.open ? " open" : ""}>
+      <summary><span class="pl-closed">${list.length ? `${list.length} on your list · Edit` : "Add your own"}</span><span class="pl-open">Done</span></summary>
+      <form class="addr" id="placeForm">
+        <input type="text" id="placeInput" value="${esc(placeUi.query)}" placeholder="Find a bar or restaurant…" aria-label="Find a bar or restaurant to add" autocomplete="off" enterkeyhint="search">
+        <button class="btn" type="submit">Find</button>
+      </form>
+      <p class="addr-msg" id="placeMsg" role="status">${placeUi.msg}</p>
+      ${hits}${rows}
+      <p class="dd-hint pl-note">Kept in this browser only.${placesEdited() && BUILT_PLACES.length ? ` <button class="btn ghost sm" type="button" id="resetPlaces">Reset list</button>` : ""}</p>
+    </details>`;
+  }
+  // re-render the menu, then put the keyboard back where it was going
+  function placesRerender(focus) {
+    renderLayersMenu();
+    const el = focus && $("layersMenu").querySelector(focus);
+    if (el) el.focus({ preventScroll: true });
+  }
+  function bindPlacesEditor() {
+    const menu = $("layersMenu");
+    menu.addEventListener("toggle", (e) => { if (e.target.id === "plEd") { placeUi.open = e.target.open; fitLayersMenu(); } }, true);   // toggle doesn't bubble
+    $("layersBox").addEventListener("toggle", fitLayersMenu);
+    addEventListener("resize", fitLayersMenu);
+    menu.addEventListener("input", (e) => { if (e.target.id === "placeInput") placeUi.query = e.target.value; });
+    // Looked up with OpenStreetMap Nominatim, like the destination field: sent only when you press Find, bounded to NYC
+    menu.addEventListener("submit", async (e) => {
+      if (e.target.id !== "placeForm") return;
+      e.preventDefault();
+      const q = placeUi.query.trim();
+      if (!q) return;
+      placeUi.hits = []; placeUi.undo = null;
+      $("placeMsg").textContent = "Looking it up…";
+      try {
+        const url = "https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
+          q: `${q}, New York, NY`, format: "json", limit: "6", addressdetails: "1", viewbox: "-74.26,40.92,-73.70,40.49", bounded: "1" });
+        const found = await (await fetch(url, { headers: { Accept: "application/json" } })).json();
+        placeUi.hits = found.map((h) => {
+          const a = h.address || {}, street = [a.house_number, a.road].filter(Boolean).join(" ");
+          const boro = boroOfAddress(a);
+          // the neighborhood, not an administrative "Community Board" name or the borough again
+          const hood = [a.neighbourhood, a.quarter, a.suburb].find((v) => v && !/community (board|district)/i.test(v) && v !== boro) || "";
+          return { name: h.name || String(h.display_name).split(",")[0], lon: +(+h.lon).toFixed(5), lat: +(+h.lat).toFixed(5), boro,
+            where: [street, hood, boro].filter(Boolean).join(", ") };
+        });
+        placeUi.msg = found.length ? "" : "Nothing by that name in NYC. Try adding the street or neighborhood.";
+      } catch (err) {
+        placeUi.msg = "The place lookup isn't reachable right now.";
+      }
+      placesRerender(placeUi.hits.length ? ".pl-hit" : "#placeInput");
+    });
+    menu.addEventListener("click", (e) => {
+      const hit = e.target.closest("[data-hit]"), un = e.target.closest("[data-unplace]");
+      if (hit) {
+        const h = placeUi.hits[+hit.dataset.hit];
+        const near = L.places.some((r) => r[2] === h.name && Math.abs(r[0] - h.lon) < 3e-4 && Math.abs(r[1] - h.lat) < 3e-4);
+        placeUi.hits = [];
+        if (near) { placeUi.msg = `${esc(h.name)} is already on your list.`; placesRerender("#placeInput"); return; }
+        placeUi.undo = JSON.stringify(placeEdits);
+        placeEdits.add.push([h.lon, h.lat, h.name, "", h.boro]);
+        placeUi.query = "";
+        placeUi.msg = `Added ${esc(h.name)}. <button class="btn ghost sm" type="button" id="undoPlace">Undo</button>`;
+        if (!layerOn.places) {
+          layerOn.places = true;
+          try { localStorage.setItem(LAYER_KEY, JSON.stringify(layerOn)); } catch (err) {}
+          applyLayerVisibility();
+        }
+        placesChanged();
+        $("placeInput")?.focus({ preventScroll: true });
+        if (map && (!MOBILE() || phoneMap.full))
+          map.easeTo({ center: [h.lon, h.lat], zoom: Math.max(map.getZoom(), 14), duration: motionMs(600) });
+        return;
+      }
+      if (un) {
+        const n = un.dataset.unplace;
+        placeUi.undo = JSON.stringify(placeEdits);
+        placeEdits.add = placeEdits.add.filter((r) => r[2] !== n);
+        if (BUILT_PLACES.some((r) => r[2] === n) && !placeEdits.hide.includes(n)) placeEdits.hide.push(n);
+        placeUi.msg = `Removed ${esc(n)}. <button class="btn ghost sm" type="button" id="undoPlace">Undo</button>`;
+        placesChanged();
+        $("undoPlace")?.focus({ preventScroll: true });
+        return;
+      }
+      if (e.target.closest("#undoPlace") && placeUi.undo) {
+        placeEdits = JSON.parse(placeUi.undo); placeUi.undo = null; placeUi.msg = "";
+        placesChanged();
+        $("placeInput")?.focus({ preventScroll: true });
+        return;
+      }
+      if (e.target.closest("#resetPlaces")) {
+        placeUi.undo = JSON.stringify(placeEdits);
+        placeEdits = { add: [], hide: [] };
+        placeUi.msg = `Back to the built list. <button class="btn ghost sm" type="button" id="undoPlace">Undo</button>`;
+        placesChanged();
+        $("undoPlace")?.focus({ preventScroll: true });
+      }
+    });
+  }
   // point rows are [lon, lat, name, extra, borough] (borough added by layers.tag_boroughs)
   const pointsFC = (rows, props) => ({ type: "FeatureCollection",
     features: (rows || []).map((r) => ({ type: "Feature", geometry: { type: "Point", coordinates: [r[0], r[1]] },
@@ -2253,7 +2414,7 @@
       ["places", "favorites", 12],
     ];
     for (const [id, iconKey, minzoom] of badges) {
-      if (!GROUPED[id].rows()?.length) continue;
+      if (!GROUPED[id].rows()?.length && id !== "places") continue;
       if (!map.hasImage("badge-" + id)) addMapImage("badge-" + id, badgeImage(iconKey, markerColor(id)));
       addGroupedSource(id);
       const lyr = { id, type: "symbol", source: id, minzoom,
