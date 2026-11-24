@@ -492,20 +492,25 @@ details.how li + li { margin-top: 4px; }
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; flex: none; }
 .sw-parks { background: #7cc58f; }
 .sw-subway { background: linear-gradient(135deg, #D82233 0 25%, #0062CF 25% 50%, #F6BC26 50% 75%, #009952 75%); border-radius: 50%; }
-.sw-bus { border-radius: 50%; background: #52514e; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
-.sw-busroutes { width: 16px; height: 4px; border-radius: 2px; background: #52514e; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
-.sw-airports { border-radius: 50%; background: #3d3c39; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
-.sw-grocery { border-radius: 50%; background: #008300; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
-.sw-gyms { border-radius: 50%; background: #6250d6; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
-.sw-dogs { border-radius: 50%; background: #8a5a2b; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
-.sw-places { border-radius: 50%; background: #d55181; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px var(--rule); }
-:root[data-theme="dark"] .sw-gyms { background: #9085e9; }
-:root[data-theme="dark"] .sw-places { background: #e87ba4; }
-:root[data-theme="dark"] .sw-dogs { background: #c08a56; }
+/* Ringed swatches: the white and grey rings are an inset ring and a border of the box itself, not outer box-shadows,
+   which aren't snapped to device pixels the way the box is (at fractional positions or display scaling the dot could
+   sit off-center inside them). The negative margin keeps the footprint at the 12px of the colored dot. */
+.sw-ring { --c: #52514e; box-sizing: content-box; padding: 1.5px; border: 1px solid var(--rule); margin: -2.5px;
+  background: var(--c); box-shadow: inset 0 0 0 1.5px #fff; border-radius: 50%; }
+.sw-bus { --c: #52514e; }
+.sw-busroutes { --c: #52514e; width: 16px; height: 4px; border-radius: 4.5px; }
+.sw-airports { --c: #3d3c39; }
+.sw-grocery { --c: #008300; }
+.sw-gyms { --c: #6250d6; }
+.sw-dogs { --c: #8a5a2b; }
+.sw-places { --c: #d55181; }
+:root[data-theme="dark"] .sw-gyms { --c: #9085e9; }
+:root[data-theme="dark"] .sw-places { --c: #e87ba4; }
+:root[data-theme="dark"] .sw-dogs { --c: #c08a56; }
 @media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) .sw-gyms { background: #9085e9; }
-  :root:where(:not([data-theme="light"])) .sw-places { background: #e87ba4; }
-  :root:where(:not([data-theme="light"])) .sw-dogs { background: #c08a56; }
+  :root:where(:not([data-theme="light"])) .sw-gyms { --c: #9085e9; }
+  :root:where(:not([data-theme="light"])) .sw-places { --c: #e87ba4; }
+  :root:where(:not([data-theme="light"])) .sw-dogs { --c: #c08a56; }
 }
 .sw-out { width: 16px; height: 11px; border: 1px solid var(--rule); border-radius: 2px; }
 .sw-short { width: 16px; height: 11px; border: 1.5px dashed var(--ink); border-radius: 2px; background: var(--wash); }
@@ -519,7 +524,7 @@ details.how li + li { margin-top: 4px; }
 .map-layers > summary::-webkit-details-marker { display: none; }
 .map-layers > summary .ic { width: 15px; height: 15px; }
 .map-layers[open] > summary { background-image: linear-gradient(var(--wash), var(--wash)); border-color: var(--rule); }
-.layers-menu { width: 280px; padding: 8px; }
+.layers-menu { width: 280px; padding: 8px; overflow: hidden auto; }
 .lm-h { font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 4px 6px; }
 .layers-menu .lm-row { display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 4px 6px; border-radius: var(--radius-sm); font-size: 13px; }
 .layers-menu label.lm-row { cursor: pointer; }
@@ -527,6 +532,33 @@ details.how li + li { margin-top: 4px; }
 .layers-menu .lm-row small { margin-left: auto; color: var(--ink-3); font-size: 11.5px; }
 .layers-menu .lm-row.key { color: var(--ink-2); font-size: 12.5px; }
 .layers-menu .lm-sep { border-top: 1px solid var(--hair); margin: 6px 0; }
+/* your places editor, tucked under its row (indented to the row's label) */
+.pl-ed { margin: -2px 0 4px; }
+.pl-ed > summary { list-style: none; display: inline-block; margin-left: 41px; padding: 2px 6px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.pl-ed > summary::-webkit-details-marker { display: none; }
+.pl-ed .pl-open, .pl-ed[open] .pl-closed { display: none; }
+.pl-ed[open] .pl-open { display: inline; }
+.pl-ed > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) { .pl-ed > summary:hover { background: var(--wash); } }
+.pl-ed[open] { margin-bottom: 6px; padding: 2px 6px 4px; border-radius: var(--radius-sm); background: var(--wash); }
+.pl-ed[open] > summary { margin-left: 35px; }
+.pl-ed .addr { margin-top: 4px; }
+.pl-ed .addr input { min-width: 0; }
+.pl-hits, .pl-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.pl-hit { display: grid; width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--raised); text-align: left; cursor: pointer; font-size: 12.5px; line-height: 1.35; }
+.pl-hits li + li { margin-top: 4px; }
+.pl-hit span { color: var(--ink-3); font-size: 11.5px; }
+@media (hover: hover) and (pointer: fine) { .pl-hit:hover { border-color: var(--rule); } }
+.pl-hit:active { border-color: var(--rule); }
+.pl-list { max-height: 220px; overflow-y: auto; overscroll-behavior: contain; }
+.pl-list li { display: flex; align-items: center; gap: 4px; min-height: 30px; font-size: 12.5px; }
+.pl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-name small { color: var(--ink-3); font-size: 11px; }
+.pl-list .icon-btn { width: 28px; height: 28px; flex: none; }
+.pl-list .icon-btn svg { width: 14px; height: 14px; }
+.pl-note { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 6px 2px 0; }
 .layers-menu .key-ic { display: inline-grid; place-items: center; width: 30px; flex: none; }
 .layers-menu .pin { cursor: default; }
 @media (hover: hover) and (pointer: fine) { .layers-menu .pin:hover { transform: none; } }
@@ -534,11 +566,14 @@ details.how li + li { margin-top: 4px; }
 
 /* rank badges on the map */
 .pin {
-  display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px;
+  /* the dark ring is a border, not a box-shadow, so it stays centered on the badge (see the ringed swatches). Borders
+     round down to whole device pixels, so 2px on standard screens (1.5px would draw as 1) and 1.5px on dense ones */
+  display: grid; place-items: center; min-width: 25px; height: 25px; padding: 0 5px; border-radius: 999px; border: 2px solid var(--ink);
   background: var(--raised); color: var(--ink); font: 700 11px/1 var(--font); font-variant-numeric: tabular-nums;
-  box-shadow: 0 0 0 1.5px var(--ink), 0 2px 6px rgba(0,0,0,.25); cursor: pointer; transition: transform .12s var(--ease);
+  box-shadow: 0 2px 6px rgba(0,0,0,.25); cursor: pointer; transition: transform .12s var(--ease);
 }
 @media (hover: hover) and (pointer: fine) { .pin:hover { transform: scale(1.18); } }
+@media (min-resolution: 2dppx) { .pin { border-width: 1.5px; } }
 .pin.sel { background: var(--ink); color: var(--surface); }
 .pin.short { grid-auto-flow: column; gap: 2px; padding: 0 6px 0 5px; }
 .pin.short svg { width: 11px; height: 11px; fill: currentColor; stroke: none; }
@@ -849,13 +884,14 @@ body.intro-held .pin { opacity: 0; }   /* no ranking shows before the priorities
   .map-tools { top: 10px; left: 10px; }
   .layers-menu { width: min(300px, calc(100vw - 40px)); }
   .layers-menu .lm-row { min-height: 44px; }
+  .pl-list li { min-height: 44px; } .pl-list .icon-btn { width: 44px; height: 44px; } .pl-hit { padding: 10px; }
   .search kbd { display: none; }
   #sort { height: 44px; }
   .btn.sm { min-height: 40px; }
   .dest-pin { width: 30px; height: 30px; }
   .area-pin { width: 34px; height: 34px; }
   .dd-menu.area-menu { width: calc(100vw - 32px); left: auto; right: 0; }   /* Area sits in the right column on phones */
-  .pin { min-width: 24px; height: 24px; border-radius: 12px; font-size: 11px; }   /* the small phone map needs room around them */
+  .pin { min-width: 27px; height: 27px; font-size: 11px; }   /* the small phone map needs room around them */
   .legend-foot label { min-height: 36px; padding-left: 6px; }
   .legend-foot input { width: 18px; height: 18px; }
   /* 44px touch targets */

@@ -40,7 +40,8 @@ start web\index.html              # Windows; or just double-click it
 2. **Get a free Census API key** at https://api.census.gov/data/key_signup.html
    and `set CENSUS_API_KEY=...` (or put it in `config.yaml`).
 3. **Optional inputs** (each one makes a factor personal):
-   - `inputs/places.csv`: your bars and restaurants (see `places.example.csv`)
+   - `inputs/places.csv`: your bars and restaurants (see `places.example.csv`). You can also add and remove places
+     on the map (Layers & key → Your bars & restaurants); those edits stay in that browser and need no rebuild
    - `inputs/activities/`: GPS files of your own runs, from any app (see the README there)
    - `inputs/rents/`: optional listing rent CSVs (see the README there); local only, never published
 4. **Run it:**
