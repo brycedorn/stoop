@@ -38,6 +38,10 @@ with sync_playwright() as pw:
     page.on("pageerror", lambda e: errs.append(str(e)))
     page.goto(URL + LINK); ready(page)
     page.evaluate("localStorage.removeItem('stoop.places.v1')"); page.reload(); ready(page)
+    # the map's recount of "your places within walk" agrees with the pipeline's for the built list
+    gap = page.evaluate(f"""() => Math.max(0, ...{S}.results().map(r => r.f.properties)
+      .filter(p => p.metrics.fav_within_walk != null).map(p => Math.abs({S}.placesWithinWalk(p) - p.metrics.fav_within_walk)))""")
+    check("within-walk recount matches the built figure", gap < 0.5, round(gap, 3))
 
     # the place sits at the label point of the top match, so it's inside that neighborhood
     top = page.evaluate(f"() => {{ const r = {S}.results().find(r => r.rank === 1); return [r.id, r.f.properties.label]; }}")
@@ -63,6 +67,9 @@ with sync_playwright() as pw:
     page.click("#ranking li button.row >> nth=0"); page.wait_for_timeout(800)   # the top match, sorted best first
     check("the top match is open", page.evaluate(f"{S}.state.selected") == top[0])
     check("added: in that neighborhood's details", NAME in (page.text_content("#detail") or ""))
+    walk = page.evaluate("""() => [...document.querySelectorAll('#detail tr')].map(tr => [...tr.cells].map(c => c.textContent))
+      .find(c => c[0] === 'Your places within walk')""")
+    check("added: counted in 'Your places within walk'", walk and float(walk[1].replace(",", "")) >= 1, walk)
 
     page.reload(); ready(page)
     check("kept after a reload", n_places(page) == n0 + 1 and NAME in page.evaluate("JSON.stringify(window.STOOP_LAYERS.places)"))

@@ -113,3 +113,12 @@ def test_road_curve():
 def test_dog_curve():
     from stoop.scoring import dog_curve
     assert list(dog_curve([0, 300, 900, 1500, 3000])) == pytest.approx([100, 100, 50, 0, 0])
+
+
+def test_personal_strings_keeps_names_with_a_hash(tmp_path):
+    from stoop.publish import personal_strings
+    (tmp_path / "inputs").mkdir()
+    (tmp_path / "inputs" / "places.csv").write_text(
+        "# my list\nname,address\nBar #9,1 Main St Apt #2\nPlain Cafe,\n", encoding="utf-8")
+    words = personal_strings(tmp_path)
+    assert "Bar #9" in words and "Plain Cafe" in words

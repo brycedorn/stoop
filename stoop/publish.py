@@ -14,6 +14,7 @@ touching your working tree. Push it with `git push origin gh-pages`; GitHub Page
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -142,10 +143,13 @@ def personal_strings(root: Path) -> list[str]:
         words += [str(w) for w in (local_cfg.get("publish") or {}).get("never_name") or []]
     places = root / "inputs" / "places.csv"
     if places.exists():       # a CSV with a `name` column, or a plain list of names (no header)
-        lines = [ln.strip() for ln in places.read_text(encoding="utf-8").splitlines()
+        # skip only lines that start with '#', so a name or address holding one ("Apt #2") is read whole
+        lines = [ln.strip() for ln in places.read_text(encoding="utf-8-sig").splitlines()
                  if ln.strip() and not ln.lstrip().startswith("#")]
         if lines and "name" in [c.strip().lower() for c in lines[0].split(",")]:
-            words += [str(n) for n in pd.read_csv(places, comment="#")["name"].dropna()]
+            df = pd.read_csv(io.StringIO("\n".join(lines)), skipinitialspace=True, dtype=str)
+            df.columns = [str(c).strip().lower() for c in df.columns]
+            words += [str(n) for n in df["name"].dropna()]
         else:
             words += [ln.split(",")[0] for ln in lines]
     return sorted({w.strip() for w in words if len(w.strip()) >= 4})

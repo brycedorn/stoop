@@ -1468,6 +1468,7 @@
     const shown = { ...m, rent_est: rent, rent_source: rentSource(p), commute_min: mins,
       commute_method: !liveCommute ? m.commute_method : liveEstimated
         ? "estimate for your pins, adjusted to routed times" : m.commute_method };
+    if (placesEdited()) shown.fav_within_walk = L.places.length ? placesWithinWalk(p) : null;
     const rows = Object.entries(META.metrics).filter(([k]) => shown[k] != null)
       .map(([k, d]) => `<tr><td>${esc(k === "rent_est" ? `Median ${bedLabel(state.bedrooms)} rent` : d.label)}</td><td>${esc(fmtMetric(shown[k], d.fmt))}</td></tr>`).join("");
 
@@ -2015,12 +2016,41 @@
   }
   applyPlaceEdits();
   const placesEdited = () => placeEdits.add.length > 0 || placeEdits.hide.length > 0;
+  // "Your places within walk" for an edited list: the pipeline's figure redone here. For each spot, count the places
+  // with a branch within the walk radius, then average the spots by residents. Desktop has the hex cells; phones
+  // don't load them, so there it's counted from the neighborhood's center point.
+  const PLACES_WALK_M = META.places_walk_m || 1000;
+  const WALK_COUNT = new Map();
+  function placesWithinWalk(p) {
+    if (WALK_COUNT.has(p.id)) return WALK_COUNT.get(p.id);
+    const kx = HX ? HX.kx : 111320 * Math.cos(40.7 * Math.PI / 180), ky = HX ? HX.ky : 110540;
+    const byName = new Map();
+    for (const r of L.places) {
+      if (!byName.has(r[2])) byName.set(r[2], []);
+      byName.get(r[2]).push([r[0] * kx, r[1] * ky]);
+    }
+    const rows = HX?.by_nta[p.id];
+    const spots = rows?.length ? rows.map((row) => [...hexCenter(row[0], row[1]), row[2] || 0])
+      : p.label ? [[p.label[0] * kx, p.label[1] * ky, 1]] : [];
+    const r2 = PLACES_WALK_M ** 2;
+    let sum = 0, pop = 0, plain = 0;
+    for (const [x, y, w] of spots) {
+      let n = 0;
+      for (const branches of byName.values()) if (branches.some(([bx, by]) => (bx - x) ** 2 + (by - y) ** 2 <= r2)) n++;
+      sum += n * w; pop += w; plain += n;
+    }
+    const v = !spots.length ? null : pop > 0 ? sum / pop : plain / spots.length;
+    WALK_COUNT.set(p.id, v);
+    return v;
+  }
+  if (!META.metrics.fav_within_walk) META.metrics.fav_within_walk = { label: "Your places within walk", fmt: "int" };
   const placeUi = { open: false, hits: [], msg: "", undo: null, query: "" };
   function placesChanged() {
     try { localStorage.setItem(PLACES_KEY, JSON.stringify(placeEdits)); } catch (e) {}
     applyPlaceEdits();
     GROUPED.places.cache = {};
     NEARBY.clear();
+    WALK_COUNT.clear();
     const src = map && map.getSource("places");
     if (src) {
       map.removeFeatureState({ source: "places" });   // ids are regenerated with the new data
@@ -3170,5 +3200,5 @@
   $("introReplay").onclick = () => { fadeVeil(0, 300); showIntro("welcome"); };
   if (firstVisit) showIntro("welcome");
 
-  window.__stoop = { state, results: () => results, update, map: () => map, intro: () => intro.step, veil: () => veil };   // for debugging in the console
+  window.__stoop = { state, results: () => results, update, map: () => map, intro: () => intro.step, veil: () => veil, placesWithinWalk };   // for debugging in the console
 })();

@@ -134,6 +134,7 @@ def build_payload(table: pd.DataFrame, scores: pd.DataFrame, geometries: dict, c
             # [lon, lat] subway stations: lets the map re-estimate commutes when a destination moves
             "stations": stations or [],
             "commute_model": _commute_model(),
+            "places_walk_m": cfg.get("walk_radius_m", 1000),   # the map recounts "your places within walk" after edits
             "weights": {k: v for k, v in weights.items()} | {k: 0 for k in FACTORS if k not in weights},
             "factors": {k: {"label": v["label"], "help": v["help"], "available": k in present}
                         for k, v in FACTORS.items()},
